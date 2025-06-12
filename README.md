@@ -1,5 +1,5 @@
 # ctfd-helper
-Alternative web client interface for Capture The Flags events. It stores in local the challenge list and details, flags submitted, etc.
+Alternative web client interface for Capture The Flags events. It stores in local the challenges, flags submitted, etc.
 
 ## Installation
 ```
@@ -26,7 +26,7 @@ npm pkg set scripts.build="rollup --config"
 ```
 
 ## Usage
-This will run a web server listening on: `http://127.0.0.1:5000`:
+This will run a web server listening on http://127.0.0.1:5000:
 ```
 npm run build # required after cloning and each time JS/HTML source code is changed
 ./ctfd-helper.py
