@@ -7,7 +7,7 @@ RUN apk add --no-cache-dir wine-mono py3-pip                    \
     -X http://dl-cdn.alpinelinux.org/alpine/edge/testing     && \
     wget -O python.zip                                          \
     https://www.python.org/ftp/python/3.13.5/python-3.13.5-embed-amd64.zip && \
-    unzip python.zip; rm -f python.zip                       && \
+    unzip python.zip && rm -f python.zip                     && \
 # pip
     wget https://bootstrap.pypa.io/get-pip.py                && \
     echo -e '\n.\\Lib\n\
