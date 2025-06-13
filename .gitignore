@@ -4,8 +4,7 @@ build/
 # CTFd saved data
 data/
 
-# NodeJS stuff
-package-lock.json
+# NodeJS modules
 node_modules/
 
 # Windows PE binary
