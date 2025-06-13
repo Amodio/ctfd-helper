@@ -2,7 +2,7 @@
 Alternative web client interface for Capture The Flags events. It stores in local the challenges, flags submitted, etc.
 
 ## Installation
-```
+```bash
 # Minimal requirement: make sure you have Flask
 apt install python3-pip git
 pip install Flask requests --break-system-packages # (or use python -m venv ctfd-helper)
@@ -18,7 +18,7 @@ npm i
 
 ## Usage
 This will run a web server and launch your browser on it (http://127.0.0.1:5000):
-```
+```bash
 npm run build # required after cloning and each time JS/HTML source code is changed
 ./ctfd-helper.py
 ```
