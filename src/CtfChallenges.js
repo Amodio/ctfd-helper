@@ -16,7 +16,7 @@ export class CtfChallenges extends LitElement {
         background: #0056b3;
       }
       button[title="List of CTF"]:hover {
-        background: #2e3a36 !important;
+        background: #6c2ebf !important;
         color: #fff !important;
       }
       .ctf-login {
@@ -374,7 +374,7 @@ export class CtfChallenges extends LitElement {
       <div style="padding:1em; background:#0008; min-width: 350px; position:relative;">
         <div style="display:flex;align-items:center;gap:0.7em;position:relative;justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:0.7em;flex:1 1 0;">
-            <button title="List of CTF" @click=${() => this.close()} style="font-size:1.3em; background:#181c1b; color:#e0ffe0; border:1px solid #222; cursor: pointer;">
+            <button title="List of CTF" @click=${() => this.close()} style="font-size:1.3em; background:#26044d; color:#fff; border:1px solid #222; cursor: pointer;">
               🔙
             </button>
             <button
