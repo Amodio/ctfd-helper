@@ -130,7 +130,7 @@ export class CtfChallengesAsUser extends LitElement {
     }
     let displayName = this.userName || '';
     if (displayName) {
-      displayName = htmlEscape(displayName);
+      displayName = unsafeHTML(displayName);
     }
     let ctfName = '';
     if (typeof this.ctfName === 'string' && this.ctfName) {
@@ -238,15 +238,6 @@ export class CtfChallengesAsUser extends LitElement {
     this.hideSolved = !this.hideSolved;
     this.requestUpdate();
   }
-}
-
-function htmlEscape(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 customElements.define('ctf-challenges-as-user', CtfChallengesAsUser);
