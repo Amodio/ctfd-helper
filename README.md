@@ -5,7 +5,7 @@ Alternative web client interface for Capture The Flags events. It stores in loca
 ```
 # Minimal requirement: make sure you have Flask
 apt install python3-pip
-pip install Flask requests
+pip install Flask requests --break-system-packages # (or use python -m venv ctfd-helper)
 
 # Fetch the code
 git clone https://github.com/Amodio/ctfd-helper.git
