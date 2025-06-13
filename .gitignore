@@ -7,3 +7,6 @@ data/
 # NodeJS stuff
 package-lock.json
 node_modules/
+
+# Windows PE binary
+ctfd-helper.exe

@@ -6,10 +6,15 @@ import json
 from datetime import datetime
 import requests
 import webbrowser
+import sys
 
 app = Flask(__name__)
 DATA_DIR = 'data'
-FRONTEND_DIR = 'build'
+
+if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+    FRONTEND_DIR = os.path.join(sys._MEIPASS, 'build')
+else:
+    FRONTEND_DIR = 'build'
 
 # CTF data cache
 _ctf_data_cache = {'ctf_id': None, 'data': None}
@@ -713,7 +718,7 @@ def get_user_challenges(ctf_id, user_id):
 if __name__ == '__main__':
     if not os.path.isdir(FRONTEND_DIR):
         print('Error: cannot find the frontend directory.')
-        exit(1)
+        sys.exit(1)
     # Create DATA_DIR if needed
     os.makedirs(DATA_DIR, exist_ok=True)
     webbrowser.open('http://127.0.0.1:5000', new=1)
