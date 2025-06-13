@@ -1,52 +1,54 @@
+---
 name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*' # Trigger on version tags like v1.2.3
-  workflow_dispatch: # Allow manual triggering
+      - 'v*'  # Trigger on version tags like v1.2.3
+  workflow_dispatch:  # Allow manual triggering
 
 permissions:
-  contents: write # Required for creating releases and uploading assets
+  contents: write  # Required for creating releases and uploading assets
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm' # Cache npm dependencies for faster builds
-          
+          cache: 'npm'  # Cache npm dependencies for faster builds
+
       - name: Install dependencies
         run: npm ci
-        
+
       - name: Build project
         run: npm run build
-        
+
       - name: Prepare release package
         run: |
           mkdir -p package
           cp ctfd-helper.py package/
           cp -r build/ package/
-          
+
       - name: Create ZIP archive
         run: |
           cd package
           zip -r ../ctfd-helper-${{ github.ref_name }}.zip .
           cd ..
           rm -rf package/
-          
+
       - name: Build Windows executable
         run: |
           docker build -t ctfd-helper/windows_builder windows_builder/
-          docker run --rm -v "${{ github.workspace }}:/mnt" --name windows_builder ctfd-helper/windows_builder
-          
+          docker run --rm -v "${{ github.workspace }}:/mnt" \
+          --name windows_builder ctfd-helper/windows_builder
+
       - name: Create GitHub release
         run: |
           # Create release if it doesn't exist
@@ -55,15 +57,15 @@ jobs:
               --title "Release ${{ github.ref_name }}" \
               --generate-notes
           fi
-          
+
           # Upload release assets
           gh release upload ${{ github.ref_name }} \
             ctfd-helper-${{ github.ref_name }}.zip \
             ctfd-helper.exe \
-            --clobber # Overwrite existing assets if they exist
+            --clobber  # Overwrite existing assets if they exist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Clean up artifacts
         if: always()
         run: |
