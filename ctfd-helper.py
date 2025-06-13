@@ -702,6 +702,9 @@ def get_user_challenges(ctf_id, user_id):
     return jsonify({'ctf_id': ctf_id, 'solved_ids': solved_ids})
 
 if __name__ == '__main__':
+    if not os.path.isdir(FRONTEND_DIR):
+        print('Error: cannot find the frontend directory.')
+        exit(1)
     # Create DATA_DIR if needed
     os.makedirs(DATA_DIR, exist_ok=True)
     webbrowser.open('http://127.0.0.1:5000', new=1)
