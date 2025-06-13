@@ -11,30 +11,52 @@ export class CtfChallengesAsUser extends LitElement {
     open: { type: Boolean },
   };
 
-  static styles = css`
-    .refresh-btn:hover {
-      background: #0056b3;
-    }
-    .ctf-username {
-      display: inline-block;
-      font-size: 1.6em;
-      font-weight: 800;
-      background: linear-gradient(90deg, #6a8caf 0%, #b0c4de 40%, #a7c7bd 70%, #7a9e9f 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      text-fill-color: transparent;
-      letter-spacing: 0.08em;
-      border-radius: 0.4em;
-      padding: 0.12em 0.45em;
-      margin: 0.1em 0.2em;
-      border: none;
-      box-shadow: none;
-      animation: none;
-      transition: none;
-      text-shadow: none;
-    }
-  `;
+  static styles = [
+    css`
+      .refresh-btn:hover {
+        background: #0056b3;
+      }
+      .ctf-username {
+        display: inline-block;
+        font-size: 1.6em;
+        font-weight: 800;
+        background: linear-gradient(90deg, #6a8caf 0%, #b0c4de 40%, #a7c7bd 70%, #7a9e9f 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-fill-color: transparent;
+        letter-spacing: 0.08em;
+        border-radius: 0.4em;
+        padding: 0.12em 0.45em;
+        margin: 0.1em 0.2em;
+        border: none;
+        box-shadow: none;
+        animation: none;
+        transition: none;
+        text-shadow: none;
+      }
+      .refresh-btn {
+        transition: transform 0.2s;
+      }
+      .refresh-btn.spinning {
+        animation: spin-refresh 1s linear infinite;
+      }
+      @keyframes spin-refresh {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .ctf-ch-row.updating {
+        animation: highlight-update 0.7s linear;
+        background: #2e3cff !important;
+        color: #fff !important;
+      }
+      @keyframes highlight-update {
+        0% { background: #2e3cff; color: #fff; }
+        80% { background: #2e3cff; color: #fff; }
+        100% { background: inherit; color: inherit; }
+      }
+    `
+  ];
 
   constructor() {
     super();
@@ -45,6 +67,8 @@ export class CtfChallengesAsUser extends LitElement {
     this.ctfUrl = '';
     this.open = false;
     this.hideSolved = false;
+    this.isLoading = false;
+    this.updatingChallengeId = null;
   }
 
   async connectedCallback() {
@@ -69,6 +93,8 @@ export class CtfChallengesAsUser extends LitElement {
       console.warn('[CtfChallengesAsUser] loadChallenges: missing ctfId or userId', { ctfId: this.ctfId, userId: this.userId });
       return;
     }
+    this.isLoading = true;
+    this.requestUpdate();
     try {
       // Fetch all challenges for the CTF
       let url = `/challenges/${this.ctfId}`;
@@ -79,14 +105,40 @@ export class CtfChallengesAsUser extends LitElement {
       if (!allResp.ok) throw new Error('Failed to fetch all challenges');
       const allData = await allResp.json();
       this.ctfName = allData.name;
-      const allChallenges = allData.challenge || allData.data || [];
+      const allChallenges = allData.challenge || allData.data || allData.challenges || [];
       // Fetch solved challenge IDs for the user
       const solvedResp = await fetch(`/${this.ctfId}/users/${this.userId}`);
       if (!solvedResp.ok) throw new Error('Failed to fetch user solved challenges');
       const solvedData = await solvedResp.json();
       const solvedIds = new Set(solvedData.solved_ids || []);
-      // Mark solved_by_user on all challenges
-      this.challenges = allChallenges.map(ch => ({ ...ch, solved_by_user: solvedIds.has(ch.id) }));
+      // For each challenge, fetch details and update UI
+      let updatedChallenges = [];
+      for (const ch of allChallenges) {
+        this.updatingChallengeId = ch.id;
+        this.requestUpdate();
+        try {
+          const resp = await fetch(`/challenge/${this.ctfId}/${ch.id}`);
+          let chDetails = ch;
+          if (resp.ok) {
+            const details = await resp.json();
+            chDetails = { ...ch, ...(details.challenge || details) };
+          }
+          chDetails.solved_by_user = solvedIds.has(ch.id);
+          updatedChallenges.push(chDetails);
+        } catch (e) {
+          ch.solved_by_user = solvedIds.has(ch.id);
+          updatedChallenges.push(ch);
+        }
+        // Remove highlight after a short delay
+        await new Promise(res => setTimeout(res, 350));
+        if (this.updatingChallengeId === ch.id) {
+          this.updatingChallengeId = null;
+          this.requestUpdate();
+        }
+        this.challenges = [...updatedChallenges, ...allChallenges.slice(updatedChallenges.length)];
+        this.requestUpdate();
+      }
+      this.challenges = updatedChallenges;
       this.requestUpdate();
     } catch (e) {
       this.challenges = [];
@@ -94,6 +146,8 @@ export class CtfChallengesAsUser extends LitElement {
       alert('Failed to load user challenges.');
       this.requestUpdate();
     }
+    this.isLoading = false;
+    this.requestUpdate();
   }
 
   render() {
@@ -140,7 +194,13 @@ export class CtfChallengesAsUser extends LitElement {
       <div style="padding:1em; background:#0008; min-width: 350px; position:relative;">
         <div style="display:flex;align-items:center;gap:0.7em;position:relative;justify-content:space-between;">
           <div style="flex:1 1 0;">
-            <button title="Refresh all challenges" style="font-size:1.6em; border: none; border-radius: 4px; background: rgb(16, 22, 21); padding: 0em 0em; cursor: pointer;" @click=${() => this.loadChallenges(true)}>🔄</button>
+            <button
+              title="Refresh all challenges"
+              class="refresh-btn${this.isLoading ? ' spinning' : ''}"
+              style="font-size:1.6em; border: none; border-radius: 4px; background: rgb(16, 22, 21); padding: 0em 0em; cursor: pointer;"
+              @click=${() => this.loadChallenges(true)}
+              ?disabled=${this.isLoading}
+            >🔄</button>
           </div>
           <div style="flex:2 1 0; display:flex; justify-content:center; align-items:center;">
             ${ctfName ? html`<span style="font-size:2.4em;font-weight:900;background: linear-gradient(90deg, #00ffe7 0%, #00aaff 30%, #7d3cff 65%, #ff3c6f 100%);-webkit-background-clip: text;-webkit-text-fill-color: transparent;background-clip: text;text-fill-color: transparent;text-shadow: 0 1px 8px #00ffe755, 0 1px 0 #222, 0 0 2px #ff3c6f99;letter-spacing: 0.02em;border-radius: 0.2em;padding: 0.03em 0.15em;display: inline-block; text-align:center;">${unsafeHTML(ctfName)}</span>` : ''}
@@ -203,7 +263,7 @@ export class CtfChallengesAsUser extends LitElement {
                       baseColor = '#7fff7f';
                     }
                     return html`
-                    <tr class="ctf-ch-row ${ch.solved_by_user ? 'solved' : 'unsolved'}"
+                    <tr class="ctf-ch-row ${ch.solved_by_user ? 'solved' : 'unsolved'}${this.updatingChallengeId === ch.id ? ' updating' : ''}"
                       style="background-color:${baseBg}; color:${baseColor}; transition:background-color 0.2s;">
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333;">
                         ${ch.solved_by_user === true

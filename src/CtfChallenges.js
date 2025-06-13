@@ -10,35 +10,57 @@ export class CtfChallenges extends LitElement {
     login: { type: String },
   };
 
-  static styles = css`
-    .refresh-btn:hover {
-      background: #0056b3;
-    }
-    button[title="List of CTF"]:hover {
-      background: #2e3a36 !important;
-      color: #fff !important;
-    }
-    .ctf-login {
-      display: inline-block;
-      font-size: 1.6em;
-      font-weight: 900;
-      background: linear-gradient(90deg, #6a8caf 0%, #b0c4de 40%, #a7c7bd 70%, #7a9e9f 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      text-fill-color: transparent;
-      letter-spacing: 0.08em;
-      border-radius: 0.4em;
-      padding: 0.12em 0.45em;
-      margin: 0.1em 0.2em;
-      /* No border, no box-shadow, no animation */
-      border: none;
-      box-shadow: none;
-      animation: none;
-      transition: none;
-      text-shadow: none;
-    }
-  `;
+  static styles = [
+    css`
+      .refresh-btn:hover {
+        background: #0056b3;
+      }
+      button[title="List of CTF"]:hover {
+        background: #2e3a36 !important;
+        color: #fff !important;
+      }
+      .ctf-login {
+        display: inline-block;
+        font-size: 1.6em;
+        font-weight: 900;
+        background: linear-gradient(90deg, #6a8caf 0%, #b0c4de 40%, #a7c7bd 70%, #7a9e9f 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-fill-color: transparent;
+        letter-spacing: 0.08em;
+        border-radius: 0.4em;
+        padding: 0.12em 0.45em;
+        margin: 0.1em 0.2em;
+        /* No border, no box-shadow, no animation */
+        border: none;
+        box-shadow: none;
+        animation: none;
+        transition: none;
+        text-shadow: none;
+      }
+      .ctf-ch-row.updating {
+        animation: highlight-update 0.7s linear;
+        background: #2e3cff !important;
+        color: #fff !important;
+      }
+      @keyframes highlight-update {
+        0% { background: #2e3cff; color: #fff; }
+        80% { background: #2e3cff; color: #fff; }
+        100% { background: inherit; color: inherit; }
+      }
+      .refresh-btn {
+        transition: transform 0.2s;
+      }
+      .refresh-btn.spinning {
+        animation: spin-refresh 1s linear infinite;
+      }
+      @keyframes spin-refresh {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `
+  ];
 
   constructor() {
     super();
@@ -52,6 +74,8 @@ export class CtfChallenges extends LitElement {
     this.categoryChallenges = null;
     this.categoryError = '';
     this.challengeDetails = {};
+    this.updatingChallengeId = null;
+    this.isLoading = false;
     // Restore login from localStorage if available
     const loginLocal = localStorage.getItem('last-ctf-login');
     if (loginLocal) {
@@ -121,7 +145,6 @@ export class CtfChallenges extends LitElement {
           const resp = await fetch(`/challenge/${this.ctfId}/${ch.id}`);
           if (resp.ok) {
             const details = await resp.json();
-            // details may be {challenge, flags}, or just challenge
             let challengeObj = details.challenge || details;
             // If flags are present, attach them to the challenge object for immediate modal display
             if (details.flags) {
@@ -135,7 +158,7 @@ export class CtfChallenges extends LitElement {
               challengeObj.name = `Challenge #${ch.id}`;
             }
             this.challengeDetails[ch.id] = challengeObj;
-            this.requestUpdate();
+            this.requestUpdate(); // Update UI after each detail fetch
           }
         } catch (e) {}
       }
@@ -152,6 +175,8 @@ export class CtfChallenges extends LitElement {
       console.warn('Error: Invalid ctfId, aborting fetch.');
       return;
     }
+    this.isLoading = true;
+    this.requestUpdate();
     try {
       let url = `/challenges/${this.ctfId}`;
       if (forceRefresh) {
@@ -171,11 +196,13 @@ export class CtfChallenges extends LitElement {
       if (forceRefresh) {
         this.challengeDetails = {};
       }
-      // Always fetch all challenge details after loading the list of challenges
-      await Promise.all(newChallenges.map(async (ch) => {
+      // Fetch all challenge details and update after each fetch
+      for (const ch of newChallenges) {
         try {
           let detailUrl = `/challenge/${this.ctfId}/${ch.id}`;
           if (forceRefresh) detailUrl += '?refresh=1';
+          this.updatingChallengeId = ch.id;
+          this.requestUpdate();
           const resp = await fetch(detailUrl);
           if (resp.ok) {
             const details = await resp.json();
@@ -183,28 +210,34 @@ export class CtfChallenges extends LitElement {
             if (details.flags) challengeObj.flags = details.flags;
             if (!challengeObj.name && challengeObj.title) challengeObj.name = challengeObj.title;
             if (!challengeObj.name) challengeObj.name = `Challenge #${ch.id}`;
-            // Ensure solved_by_me is set on the challenge object for correct rendering
             if (typeof ch.solved_by_me !== 'undefined') {
               challengeObj.solved_by_me = ch.solved_by_me;
             }
             this.challengeDetails[ch.id] = challengeObj;
+            if (typeof this.challengeDetails[ch.id].solved_by_me !== 'undefined') {
+              ch.solved_by_me = this.challengeDetails[ch.id].solved_by_me;
+            }
+            this.challenges = [...newChallenges];
+            this.requestUpdate();
+          }
+          // Remove highlight after a short delay
+          await new Promise(res => setTimeout(res, 350));
+          if (this.updatingChallengeId === ch.id) {
+            this.updatingChallengeId = null;
+            this.requestUpdate();
           }
         } catch (e) {}
-      }));
-      // Now update the challenge list only after all details are fetched
-      // Ensure solved_by_me is set on the main challenge list for correct rendering
-      for (const ch of newChallenges) {
-        if (this.challengeDetails[ch.id] && typeof this.challengeDetails[ch.id].solved_by_me !== 'undefined') {
-          ch.solved_by_me = this.challengeDetails[ch.id].solved_by_me;
-        }
       }
-      this.challenges = newChallenges;
+      // Final update in case some details failed
+      this.challenges = [...newChallenges];
       this.requestUpdate();
     } catch (e) {
       this.challenges = [];
       alert('Failed to load challenges.');
       this.requestUpdate();
     }
+    this.isLoading = false;
+    this.requestUpdate();
   }
 
   close() {
@@ -303,7 +336,13 @@ export class CtfChallenges extends LitElement {
             <button title="List of CTF" @click=${() => this.close()} style="font-size:1.3em; background:#181c1b; color:#e0ffe0; border:1px solid #222; cursor: pointer;">
               🔙
             </button>
-            <button title="Refresh all challenges" style="font-size:1.6em; border: none; border-radius: 4px; background: rgb(16, 22, 21); padding: 0em 0em; cursor: pointer;" @click=${() => this.loadChallenges(true)}>🔄</button>
+            <button
+              title="Refresh all challenges"
+              class="refresh-btn${this.isLoading ? ' spinning' : ''}"
+              style="font-size:1.6em; border: none; border-radius: 4px; background: rgb(16, 22, 21); padding: 0em 0em; cursor: pointer;"
+              @click=${() => this.loadChallenges(true)}
+              ?disabled=${this.isLoading}
+            >🔄</button>
           </div>
           <div style="flex:2 1 0; display:flex; justify-content:center; align-items:center;">
             ${ctfName ? html`<span style="font-size:2.4em;font-weight:900;background: linear-gradient(90deg, #00ffe7 0%, #00aaff 30%, #7d3cff 65%, #ff3c6f 100%);-webkit-background-clip: text;-webkit-text-fill-color: transparent;background-clip: text;text-fill-color: transparent;text-shadow: 0 1px 8px #00ffe755, 0 1px 0 #222, 0 0 2px #ff3c6f99;letter-spacing: 0.02em;border-radius: 0.2em;padding: 0.03em 0.15em;display: inline-block; text-align:center;">${ctfName}</span>` : ''}
@@ -389,7 +428,7 @@ export class CtfChallenges extends LitElement {
                       hoverColor = '#aaa';
                     }
                     return html`
-                    <tr class="ctf-ch-row ${details.solved_by_me ? 'solved' : 'unsolved'}"
+                    <tr class="ctf-ch-row ${details.solved_by_me ? 'solved' : 'unsolved'}${this.updatingChallengeId === ch.id ? ' updating' : ''}"
                       style="background-color:${baseBg}; color:${baseColor}; transition:background-color 0.2s; opacity:${isLocked ? 0.5 : 1};cursor:pointer;"
                       @click=${() => { this.openChallenge(details); }}
                       @mouseover=${function(e){
@@ -443,7 +482,7 @@ export class CtfChallenges extends LitElement {
             </tbody>
           </table>
         </div>
-        ${Object.keys(grouped).length === 0 ? html`<p>No challenges found.</p>` : ''}
+        ${Object.keys(grouped).length === 0 ? html`<p>No challenges yet, please wait...</p>` : ''}
         ${this.selectedChallenge ? html`
           <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0008;z-index:1000;display:flex;align-items:center;justify-content:center;"
             @click=${e => { if (e.target === e.currentTarget) this.closeChallenge(); }}
