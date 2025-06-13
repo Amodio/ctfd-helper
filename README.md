@@ -24,7 +24,7 @@ npm run build # required after cloning and each time JS/HTML source code is chan
 ```
 
 ## Notes
-If you did not unlock all the challenges, the calculations (points acquired, etc.) will be lower than from the scoreboard (as we do not care about it).
+If you did not unlock all the challenges, the calculations (total points, etc.) will be lower than from the scoreboard (as we do not care about it).
 
 The final aim is to provide an interface for CTFd that would solve some challenges by itself.
 
