@@ -4,7 +4,7 @@ Alternative web client interface for Capture The Flags events. It stores in loca
 ## Installation
 ```
 # Minimal requirement: make sure you have Flask
-apt install python3-pip
+apt install python3-pip git
 pip install Flask requests --break-system-packages # (or use python -m venv ctfd-helper)
 
 # Fetch the code
