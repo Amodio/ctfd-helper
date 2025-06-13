@@ -9,5 +9,5 @@ docker build -t ctfd-helper/windows_builder windows_builder/
 
 ## Run
 ```bash
-docker run --rm -it -v "$(pwd):/mnt" --name windows_builder Amodio/windows_builder
+docker run --rm -it -v "$(pwd):/mnt" --name windows_builder ctfd-helper/windows_builder
 ```
