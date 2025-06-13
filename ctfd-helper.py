@@ -134,6 +134,7 @@ def fetch_challenge(url, login, password, ctf_id, ch_id, ctf_data=None):
         if not token:
             return None, f"Could not fetch session token: {err}"
     headers = {'Cookie': f"session={token}"}
+    print(f"[DBG] Fetching challenge #{ch_id} details for CTF @ {url}")
     try:
         r = requests.get(f"{url}/api/v1/challenges/{ch_id}", headers=headers, timeout=60)
         if r.ok:
@@ -233,6 +234,7 @@ def serve_static(path):
 
 def fetch_session_token(url, login, password, ctf_data=None, ctf_id=None):
     """Fetch session token from CTFd using login and password. If ctf_data and ctf_id are provided, update the cache if the token changes."""
+    print(f"[DBG] Fetching session token for CTF @ {url} with login {login}")
     try:
         s = requests.Session()
         # Get CSRF token from login page
@@ -493,6 +495,7 @@ def _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data=None):
         if not token:
             return None, f"Could not fetch session token: {err}"
     headers = {'Cookie': f"session={token}"}
+    print(f"[DBG] Fetching solves for challenge #{chall_id} in CTF @ {url}")
     try:
         api_url = f"{url}/api/v1/challenges/{chall_id}/solves"
         r = requests.get(api_url, headers=headers, timeout=60)
@@ -537,6 +540,7 @@ def get_ctfd_title():
     if not url.startswith('http://') and not url.startswith('https://'):
         url = 'https://' + url
     try:
+        print(f"[DBG] Fetching title for CTF @ {url}")
         r = requests.get(url, timeout=15)
         if not r.ok:
             return jsonify({'error': f'Failed to fetch: {r.status_code}'}), 400
@@ -622,6 +626,7 @@ def get_hint_content(ctf_id, chall_id, hint_id):
             print(f"[ERR] CTF #{ctf_id} not found in cache")
             return jsonify({'error': f"Could not fetch session token: {err}"}), 502
     headers = {'Cookie': f"session={token}"}
+    print(f"[DBG] Fetching hint content for challenge #{chall_id}, hint #{hint_id} in CTF @ {url}")
     try:
         api_url = f"{url}/api/v1/hints/{hint_id}"
         # First, try to fetch the hint details
@@ -659,6 +664,7 @@ def get_hint_content(ctf_id, chall_id, hint_id):
         unlock_headers = headers.copy()
         unlock_headers['Content-Type'] = 'application/json'
         unlock_headers['Csrf-Token'] = csrf_nonce
+        print(f"[DBG] Unlocking hint {hint_id} for challenge {chall_id}, CTF {ctf_id}")
         unlock_resp = requests.post(unlock_url, headers=unlock_headers, json=unlock_payload, timeout=30)
         print(unlock_payload)
         print(f"[DBG] Unlocking hint {hint_id} for challenge {chall_id}, CTF {ctf_id}: {unlock_resp.status_code} {unlock_resp.text}")
