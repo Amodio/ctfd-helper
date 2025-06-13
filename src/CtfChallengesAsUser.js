@@ -130,7 +130,7 @@ export class CtfChallengesAsUser extends LitElement {
     }
     let displayName = this.userName || '';
     if (displayName) {
-      displayName = unsafeHTML(displayName);
+      displayName = displayName;
     }
     let ctfName = '';
     if (typeof this.ctfName === 'string' && this.ctfName) {
