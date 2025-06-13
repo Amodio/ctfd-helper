@@ -134,7 +134,6 @@ def fetch_challenge(url, login, password, ctf_id, ch_id, ctf_data=None):
         if not token:
             return None, f"Could not fetch session token: {err}"
     headers = {'Cookie': f"session={token}"}
-    print(f"[DBG] Fetching challenge #{ch_id}'s details, CTF #{ctf_id} @ {url}")
     try:
         r = requests.get(f"{url}/api/v1/challenges/{ch_id}", headers=headers, timeout=60)
         if r.ok:
@@ -190,9 +189,12 @@ def get_challenge(ctf_id, chall_id):
             ctf_data['challenge'] = challenge
             if update_ctf_cache(ctf_id, ctf_data) == False:
                 return jsonify({'error': 'Failed to update CTF data'}), 500
+            # Fetch and cache solves after updating challenge cache
+            _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data)
         else:
             return jsonify({'error': err_msg}), 404
     # Extract hints from the challenge details (do not fetch from /hints endpoint)
+    # XXX: That may cause a problem if the challenge's hints get rewritten
     challenge_list = ctf_data.get('challenge', [])
     ch_obj = None
     for ch in challenge_list:
@@ -374,7 +376,6 @@ def test_flag(ctf_id, chall_id, flag_id):
                 return jsonify({'success': False, 'error': f"CTFd API error: {r.status_code} {r.text}"}), 502
         try:
             resp = r.json()
-            print(f"[DBG] Response from CTFd: {resp}")
         except Exception as e:
             return jsonify({'success': False, 'error': f"Malformed response from CTFd server: {e}", 'raw': r.text}), 502
         # Update flag state based on response
@@ -461,21 +462,19 @@ def delete_flags(ctf_id, chall_id):
         return jsonify({'error': 'Failed to update CTF data'}), 500
     return jsonify({'success': True, 'deleted': len(flags) - len(new_flags)})
 
-@app.route('/solves/<int:ctf_id>/<int:chall_id>', methods=['GET'])
-def get_challenge_solves(ctf_id, chall_id):
-    """Fetch and cache the list of users who solved a specific challenge from the remote CTFd server."""
-    ctf_data = load_ctf_cache(ctf_id)
+def _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data=None):
+    """Fetch and cache the list of users who solved a specific challenge from the remote CTFd server. Returns (solves, error_msg)."""
     if ctf_data is None:
-        return jsonify({'error': 'CTF not found'}), 404
+        ctf_data = load_ctf_cache(ctf_id)
+    if ctf_data is None:
+        return None, 'CTF not found'
     url = ctf_data.get('url')
     login = ctf_data.get('login')
     password = ctf_data.get('password')
     if not url or not login or not password:
-        return jsonify({'error': 'Missing CTFd URL, login, or password'}), 400
-    # Use a cache key in ctf_data
+        return None, 'Missing CTFd URL, login, or password'
     solves = ctf_data.get('solves', {})
     cache_key = str(chall_id)
-    # Only refresh from remote if solves is different than the length of solves
     challenges = ctf_data.get('challenges') or []
     challenge_summary = next((c for c in challenges if str(c.get('id')) == str(chall_id)), None)
     summary_solves = None
@@ -485,15 +484,15 @@ def get_challenge_solves(ctf_id, chall_id):
         except Exception:
             pass
     cached_solves = solves.get(cache_key, [])
+    # Only fetch if the number of solves in summary does not match the cache length
     if summary_solves is not None and len(cached_solves) == summary_solves:
-        return jsonify({'solves': cached_solves})
+        return cached_solves, None
     token = ctf_data.get('token')
     if not token:
         token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
         if not token:
-            return jsonify({'error': f"Could not fetch session token: {err}"}), 502
+            return None, f"Could not fetch session token: {err}"
     headers = {'Cookie': f"session={token}"}
-    print(f"[DBG] Fetching solves for challenge {chall_id} from CTF @ {url}")
     try:
         api_url = f"{url}/api/v1/challenges/{chall_id}/solves"
         r = requests.get(api_url, headers=headers, timeout=60)
@@ -502,13 +501,13 @@ def get_challenge_solves(ctf_id, chall_id):
             if r.status_code == 401:
                 token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
                 if not token:
-                    return jsonify({'error': f"Could not fetch session token: {err}"}), 502
+                    return None, f"Could not fetch session token: {err}"
                 headers = {'Cookie': f"session={token}"}
                 r = requests.get(api_url, headers=headers, timeout=60)
                 if not r.ok:
-                    return jsonify({'error': f"CTFd API error: {r.status_code} {r.text}"}), 502
+                    return None, f"CTFd API error: {r.status_code} {r.text}"
             else:
-                return jsonify({'error': f"CTFd API error: {r.status_code} {r.text}"}), 502
+                return None, f"CTFd API error: {r.status_code} {r.text}"
         data = r.json()
         solves = data.get('data', [])
         # Cache the solves in ctf_data
@@ -516,10 +515,18 @@ def get_challenge_solves(ctf_id, chall_id):
             ctf_data['solves'] = {}
         ctf_data['solves'][cache_key] = solves
         if update_ctf_cache(ctf_id, ctf_data) == False:
-            return jsonify({'error': 'Failed to update CTF data'}), 500
-        return jsonify({'solves': solves})
+            return None, 'Failed to update CTF data'
+        return solves, None
     except Exception as e:
-        return jsonify({'error': f"Exception occurred: {e}"}), 500
+        return None, f"Exception occurred: {e}"
+
+@app.route('/solves/<int:ctf_id>/<int:chall_id>', methods=['GET'])
+def get_challenge_solves(ctf_id, chall_id):
+    """Fetch and cache the list of users who solved a specific challenge from the remote CTFd server."""
+    solves, err = _fetch_and_cache_challenge_solves(ctf_id, chall_id)
+    if err:
+        return jsonify({'error': err}), 500 if 'Exception' in err or 'Failed' in err else 404
+    return jsonify({'solves': solves})
 
 @app.route('/ctfd_title', methods=['POST'])
 def get_ctfd_title():
@@ -588,7 +595,6 @@ def update_ctf_credentials(ctf_id):
 @app.route('/hint/<int:ctf_id>/<int:chall_id>/<int:hint_id>', methods=['GET'])
 def get_hint_content(ctf_id, chall_id, hint_id):
     """Fetch and cache the content for a specific hint only when requested. Store content in ctf_data['hint_contents'][chall_id][hint_id]."""
-    print(f"[DBG] Fetching hint content for CTF #{ctf_id}, challenge #{chall_id}, hint #{hint_id}")
     ctf_data = load_ctf_cache(ctf_id)
     if ctf_data is None:
         print(f"[ERR] CTF #{ctf_id} not found in cache")
@@ -607,7 +613,6 @@ def get_hint_content(ctf_id, chall_id, hint_id):
         hint_contents[chall_key] = {}
     # If content is already cached, return it
     if hint_key in hint_contents[chall_key]:
-        print(f"[DBG] Returning cached hint content for CTF #{ctf_id}, challenge #{chall_id}, hint #{hint_id}")
         return jsonify({'content': hint_contents[chall_key][hint_key]})
     # Fetch content from remote
     token = ctf_data.get('token')
@@ -637,7 +642,6 @@ def get_hint_content(ctf_id, chall_id, hint_id):
                 print(f"[ERR] CTF #{ctf_id} not found in cache")
                 return jsonify({'error': f"CTFd API error: {r.status_code} {r.text}"}), 502
         data = r.json().get('data', {})
-        print(f"[DBG] Fetched hint details: {data}")
         content = data.get('content') or data.get('description') or ''
         # If content is present, cache and return it
         if content:
@@ -668,7 +672,6 @@ def get_hint_content(ctf_id, chall_id, hint_id):
         if not r2.ok:
             return jsonify({'error': f"CTFd API error after unlock: {r2.status_code} {r2.text}"}), 502
         data2 = r2.json().get('data', {})
-        print(f"[DBG] Fetched hint details after unlock: {data2}")
         content2 = data2.get('content') or data2.get('description') or ''
         if content2:
             hint_contents[chall_key][hint_key] = content2
