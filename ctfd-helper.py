@@ -5,6 +5,7 @@ from flask import Flask, jsonify, request, send_from_directory
 import json
 from datetime import datetime
 import requests
+import webbrowser
 
 app = Flask(__name__)
 DATA_DIR = 'data'
@@ -703,5 +704,5 @@ def get_user_challenges(ctf_id, user_id):
 if __name__ == '__main__':
     # Create DATA_DIR if needed
     os.makedirs(DATA_DIR, exist_ok=True)
-
+    webbrowser.open('http://127.0.0.1:5000', new=1)
     app.run(debug=False)
