@@ -111,13 +111,41 @@ export class CtfChallengesAsUser extends LitElement {
       if (!solvedResp.ok) throw new Error('Failed to fetch user solved challenges');
       const solvedData = await solvedResp.json();
       const solvedIds = new Set(solvedData.solved_ids || []);
-      // For each challenge, fetch details and update UI
-      let updatedChallenges = [];
+      // Group and sort challenges as in render
+      const grouped = {};
+      const tagOrder = ['intro', 'easy', 'medium', 'hard', 'insane'];
+      function tagRank(tags) {
+        if (!tags || !tags.length) return 999;
+        const tagVals = tags.map(t => (t.value || t).toLowerCase());
+        for (const tag of tagOrder) {
+          if (tagVals.includes(tag)) return tagOrder.indexOf(tag);
+        }
+        return 999;
+      }
       for (const ch of allChallenges) {
+        const cat = ch.category || 'Uncategorized';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(ch);
+      }
+      let fetchOrder = [];
+      for (const cat in grouped) {
+        grouped[cat].sort((a, b) => tagRank(a.tags) - tagRank(b.tags));
+        grouped[cat] = grouped[cat].map(ch => {
+          if (!ch.name && ch.title) ch.name = ch.title;
+          if (!ch.name) ch.name = `Challenge #${ch.id}`;
+          return ch;
+        });
+        fetchOrder = fetchOrder.concat(grouped[cat]);
+      }
+      // Fetch details in the order of fetchOrder
+      let updatedChallenges = [];
+      for (const ch of fetchOrder) {
         this.updatingChallengeId = ch.id;
         this.requestUpdate();
         try {
-          const resp = await fetch(`/challenge/${this.ctfId}/${ch.id}`);
+          let detailUrl = `/challenge/${this.ctfId}/${ch.id}`;
+          if (forceRefresh) detailUrl += '?refresh=1';
+          const resp = await fetch(detailUrl);
           let chDetails = ch;
           if (resp.ok) {
             const details = await resp.json();
@@ -135,7 +163,7 @@ export class CtfChallengesAsUser extends LitElement {
           this.updatingChallengeId = null;
           this.requestUpdate();
         }
-        this.challenges = [...updatedChallenges, ...allChallenges.slice(updatedChallenges.length)];
+        this.challenges = [...updatedChallenges, ...fetchOrder.slice(updatedChallenges.length)];
         this.requestUpdate();
       }
       this.challenges = updatedChallenges;

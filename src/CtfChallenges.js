@@ -196,8 +196,34 @@ export class CtfChallenges extends LitElement {
       if (forceRefresh) {
         this.challengeDetails = {};
       }
-      // Fetch all challenge details and update after each fetch
+      // Group and sort challenges as in render
+      const grouped = {};
       for (const ch of newChallenges) {
+        const cat = ch.category || 'Uncategorized';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(ch);
+      }
+      const tagOrder = ['intro', 'easy', 'medium', 'hard', 'insane'];
+      function tagRank(tags) {
+        if (!tags || !tags.length) return 999;
+        const tagVals = tags.map(t => (t.value || t).toLowerCase());
+        for (const tag of tagOrder) {
+          if (tagVals.includes(tag)) return tagOrder.indexOf(tag);
+        }
+        return 999;
+      }
+      let fetchOrder = [];
+      for (const cat in grouped) {
+        grouped[cat].sort((a, b) => tagRank(a.tags) - tagRank(b.tags));
+        grouped[cat] = grouped[cat].map(ch => {
+          if (!ch.name && ch.title) ch.name = ch.title;
+          if (!ch.name) ch.name = `Challenge #${ch.id}`;
+          return ch;
+        });
+        fetchOrder = fetchOrder.concat(grouped[cat]);
+      }
+      // Fetch details in the order of fetchOrder
+      for (const ch of fetchOrder) {
         try {
           let detailUrl = `/challenge/${this.ctfId}/${ch.id}`;
           if (forceRefresh) detailUrl += '?refresh=1';
@@ -217,7 +243,7 @@ export class CtfChallenges extends LitElement {
             if (typeof this.challengeDetails[ch.id].solved_by_me !== 'undefined') {
               ch.solved_by_me = this.challengeDetails[ch.id].solved_by_me;
             }
-            this.challenges = [...newChallenges];
+            this.challenges = [...fetchOrder];
             this.requestUpdate();
           }
           // Remove highlight after a short delay
@@ -229,7 +255,7 @@ export class CtfChallenges extends LitElement {
         } catch (e) {}
       }
       // Final update in case some details failed
-      this.challenges = [...newChallenges];
+      this.challenges = [...fetchOrder];
       this.requestUpdate();
     } catch (e) {
       this.challenges = [];
@@ -482,7 +508,7 @@ export class CtfChallenges extends LitElement {
             </tbody>
           </table>
         </div>
-        ${Object.keys(grouped).length === 0 ? html`<p>No challenges yet, please wait...</p>` : ''}
+        ${Object.keys(grouped).length === 0 ? html`<p>No challenges yet, please wait a few seconds...</p>` : ''}
         ${this.selectedChallenge ? html`
           <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0008;z-index:1000;display:flex;align-items:center;justify-content:center;"
             @click=${e => { if (e.target === e.currentTarget) this.closeChallenge(); }}
