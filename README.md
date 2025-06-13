@@ -26,7 +26,7 @@ npm run build # required after cloning and each time JS/HTML source code is chan
 ## Notes
 The final aim is to provide an interface for CTFd that would solve some challenges by itself.
 
-No automation in that regard is implemented yet, stay focused :)
-Any help will be appreciated as the task is pretty large.
+No automation in that regard is implemented yet, stay tuned :)
+Any help will be appreciated as the task is huge.
 
 Backend is powered by Python3/Flask, frontend by [Lit](https://lit.dev) (packed with rollup).
