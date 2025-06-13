@@ -175,6 +175,12 @@ export class CtfChallenges extends LitElement {
       console.warn('Error: Invalid ctfId, aborting fetch.');
       return;
     }
+    // Abort any previous fetches
+    if (this._abortController) {
+      this._abortController.abort();
+    }
+    this._abortController = new AbortController();
+    const signal = this._abortController.signal;
     this.isLoading = true;
     this.requestUpdate();
     try {
@@ -182,7 +188,7 @@ export class CtfChallenges extends LitElement {
       if (forceRefresh) {
         url += '?refresh=1';
       }
-      const response = await fetch(url);
+      const response = await fetch(url, { signal });
       if (!response.ok) throw new Error('Failed to fetch challenges');
       const data = await response.json();
       const newChallenges = data.challenges || [];
@@ -229,7 +235,7 @@ export class CtfChallenges extends LitElement {
           if (forceRefresh) detailUrl += '?refresh=1';
           this.updatingChallengeId = ch.id;
           this.requestUpdate();
-          const resp = await fetch(detailUrl);
+          const resp = await fetch(detailUrl, { signal });
           if (resp.ok) {
             const details = await resp.json();
             let challengeObj = details.challenge || details;
@@ -252,12 +258,16 @@ export class CtfChallenges extends LitElement {
             this.updatingChallengeId = null;
             this.requestUpdate();
           }
-        } catch (e) {}
+        } catch (e) {
+          if (e.name === 'AbortError') return; // Stop all further processing if aborted
+        }
+        if (signal.aborted) return;
       }
       // Final update in case some details failed
       this.challenges = [...fetchOrder];
       this.requestUpdate();
     } catch (e) {
+      if (e.name === 'AbortError') return;
       this.challenges = [];
       alert('Failed to load challenges.');
       this.requestUpdate();
@@ -267,6 +277,11 @@ export class CtfChallenges extends LitElement {
   }
 
   close() {
+    // Abort any ongoing fetches
+    if (this._abortController) {
+      this._abortController.abort();
+      this._abortController = null;
+    }
     this.open = false;
     this.ctfId = null;
     this.challenges = [];
