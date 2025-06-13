@@ -13,15 +13,7 @@ cd ctfd-helper/
 
 # For building the javascript/HTML source code (with rollup)
 apt install npm rollup
-npm init -y
-npm install --save lit
-npm i --save-dev rollup \
-  @web/rollup-plugin-html \
-  @rollup/plugin-node-resolve \
-  @rollup/plugin-terser \
-  rollup-plugin-minify-html-literals
-
-npm pkg set scripts.build="rollup --config"
+npm i
 ```
 
 ## Usage
