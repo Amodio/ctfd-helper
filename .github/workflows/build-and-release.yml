@@ -30,18 +30,16 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Prepare release package
+      - name: Prepare release
         run: |
-          mkdir -p package
-          cp ctfd-helper.py package/
-          cp -r build/ package/
+          mkdir ctfd-helper
+          cp ctfd-helper.py ctfd-helper/
+          cp -r build/ ctfd-helper/
 
       - name: Create ZIP archive
         run: |
-          cd package
-          zip -r ../ctfd-helper.zip .
-          cd ..
-          rm -rf package/
+          zip -r ctfd-helper.zip ctfd-helper/
+          rm -rf ctfd-helper/
 
       - name: Build Windows executable
         run: |
@@ -69,5 +67,5 @@ jobs:
         if: always()
         run: |
           rm -f ctfd-helper.zip ctfd-helper.exe
-          docker rmi ctfd-helper/windows_builder || true
-          docker system prune -f || true  # Clean up unused Docker images and containers
+#          docker rmi ctfd-helper/windows_builder || true
+#          docker system prune -f || true  # Clean up unused Docker images and containers

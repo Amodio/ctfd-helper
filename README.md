@@ -1,5 +1,5 @@
 # ctfd-helper
-Alternative web client interface for Capture The Flags events. It stores in local the challenges, flags submitted, etc.
+Alternative web client interface for Capture The Flags events. It stores locally the challenges, flags submitted, etc.
 
 ## Installation
 ```bash
@@ -28,7 +28,7 @@ npm run build # required after cloning and each time JS/HTML src/ code is change
 ```
 
 ## Notes
-If you did not unlock all the challenges, some calculations (number of challenges, etc.) can differ than from the scoreboard (we do not care about it).
+If you did not unlock all the challenges, some calculations (number of challenges, etc.) can differ from the scoreboard (we do not care about it).
 
 The final aim is to provide an interface for CTFd that would solve some challenges by itself.
 
