@@ -34,7 +34,7 @@ jobs:
         run: |
           mkdir ctfd-helper
           cp ctfd-helper.py ctfd-helper/
-          cp -r build/ ctfd-helper/
+          mv build/ ctfd-helper/
 
       - name: Create ZIP archive
         run: |
