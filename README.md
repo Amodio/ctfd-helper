@@ -7,12 +7,12 @@ Alternative web client interface for Capture The Flags events. It stores locally
 apt install python3-pip
 pip install Flask requests --break-system-packages # (or use python -m venv ctfd-helper)
 
-wget https://github.com/Amodio/ctfd-helper/releases/download/main/ctfd-helper.zip && \
+wget https://github.com/Amodio/ctfd-helper/releases/download/v0.1/ctfd-helper.zip && \
 unzip ctfd-helper.zip && cd ctfd-helper/
 ./ctfd-helper.py
 ```
 
-For Windows, you can also use the bundled package (a bit slower): [ctfd-helper.exe](https://github.com/Amodio/ctfd-helper/releases/download/main/ctfd-helper.exe).
+For Windows, you can also use the bundled package (a bit slower): [ctfd-helper.exe](https://github.com/Amodio/ctfd-helper/releases/download/v0.1/ctfd-helper.exe).
 
 ## Installation for developpers
 ```bash
