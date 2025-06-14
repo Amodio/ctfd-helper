@@ -3,28 +3,32 @@ Alternative web client interface for Capture The Flags events. It stores in loca
 
 ## Installation
 ```bash
-# Minimal requirement: make sure you have Flask
-apt install python3-pip git
+# Minimal requirement: Python3 with Flask
+apt install python3-pip
 pip install Flask requests --break-system-packages # (or use python -m venv ctfd-helper)
 
-# Fetch the code
+wget https://github.com/Amodio/ctfd-helper/releases/download/main/ctfd-helper.zip && \
+unzip ctfd-helper.zip && cd ctfd-helper/
+./ctfd-helper.py
+```
+
+For Windows, you can also use the bundled package (a bit slower): [ctfd-helper.exe](https://github.com/Amodio/ctfd-helper/releases/download/main/ctfd-helper.exe).
+
+## Installation for developpers
+```bash
 git clone https://github.com/Amodio/ctfd-helper.git
 cd ctfd-helper/
 
 # For building the javascript/HTML source code (with rollup)
 apt install npm rollup
-npm i
-```
+npm ci
 
-## Usage
-This will run a web server and launch your browser on it (http://127.0.0.1:5000):
-```bash
-npm run build # required after cloning and each time JS/HTML source code is changed
+npm run build # required after cloning and each time JS/HTML src/ code is changed
 ./ctfd-helper.py
 ```
 
 ## Notes
-If you did not unlock all the challenges, the calculations (total points, etc.) will be lower than from the scoreboard (as we do not care about it).
+If you did not unlock all the challenges, some calculations (number of challenges, etc.) can differ than from the scoreboard (we do not care about it).
 
 The final aim is to provide an interface for CTFd that would solve some challenges by itself.
 
