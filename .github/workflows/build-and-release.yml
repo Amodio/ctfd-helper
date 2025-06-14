@@ -18,6 +18,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Debug - List files in repository
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Files in root:"
+          ls -la
+          echo "Looking for package files:"
+          find . -name "package*.json" -type f
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
