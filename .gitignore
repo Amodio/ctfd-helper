@@ -9,3 +9,6 @@ node_modules/
 
 # Windows PE binary
 ctfd-helper.exe
+
+# Not directly used by this project anyways
+misc/hackropole_dump.json
