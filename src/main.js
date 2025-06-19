@@ -142,6 +142,10 @@ export class CtfList extends LitElement {
       }
       const data = await response.json();
       this.ctfs = data.ctfs || [];
+      // Set last login from backend if available
+      if (data.last_login) {
+        this.formLogin = data.last_login;
+      }
       // Restore last opened CTF after ctfs are loaded
       if (this.autoOpenCtfId && this.ctfs.length > 0) {
         this.showCtfById(this.autoOpenCtfId);
@@ -168,7 +172,8 @@ export class CtfList extends LitElement {
     this.showForm = true;
     this.formUrl = '';
     this.formName = '';
-    this.formLogin = '';
+    // Preset login from property if available
+    this.formLogin = this.formLogin || '';
     this.formPassword = '';
     this.updateComplete && this.updateComplete.then(() => {
       const input = this.renderRoot.querySelector('input[type="text"]');
@@ -234,6 +239,8 @@ export class CtfList extends LitElement {
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
     }
+    // Update last login property for session use
+    this.formLogin = login;
     const formData = new FormData();
     formData.append('url', url);
     formData.append('name', name);
@@ -286,6 +293,8 @@ export class CtfList extends LitElement {
       alert('Login and password cannot be empty.');
       return;
     }
+    // Update last login property for session use
+    this.formLogin = newLogin.trim();
     try {
       const resp = await fetch(`/ctf/${ctf.id}/credentials`, {
         method: 'POST',

@@ -56,26 +56,29 @@ def update_ctf_cache(ctf_id, ctf_data):
 
 @app.route('/ctfs', methods=['GET'])
 def list_ctfs():
-    """Lists available saved CTFs."""
+    """Lists available saved CTFs and returns the last used login if available."""
     ctf_list = []
+    last_login = None
     for filename in os.listdir(DATA_DIR):
         if filename.startswith('ctf_') and filename.endswith('.json'):
             try:
-                ctf_id = int(filename[4:-5])  # Extract ID (ctf_X.json)
-                ctf_data = load_ctf_cache(ctf_id)
-                if not ctf_data:
-                    continue
-                url = ctf_data.get('url')
-                name = ctf_data.get('name')
-                login = ctf_data.get('login')
-                # Do not return password
-                if url and name and login:
-                    ctf_list.append({'id': ctf_id, 'url': url, 'name': name, 'login': login})
-                else:
-                    return jsonify({'error': f"CTF #{ctf_id} missing fields {ctf_data = }."}), 400
-            except ValueError:
-                return jsonify({'error': f"Invalid file: {filename}"}), 400
-    return jsonify({'ctfs': ctf_list})
+                with open(os.path.join(DATA_DIR, filename), 'r') as f:
+                    data = json.load(f)
+                    ctf_id = int(filename[4:-5])
+                    ctf_entry = {
+                        'id': ctf_id,
+                        'name': data.get('name'),
+                        'url': data.get('url'),
+                        'login': data.get('login'),
+                        # add other fields if needed
+                    }
+                    ctf_list.append(ctf_entry)
+                    # Track the last login found (most recent file wins)
+                    if data.get('login'):
+                        last_login = data.get('login')
+            except Exception:
+                pass
+    return jsonify({'ctfs': ctf_list, 'last_login': last_login})
 
 @app.route('/update_token/<int:ctf_id>', methods=['POST'])
 def update_ctf_token(ctf_id):
