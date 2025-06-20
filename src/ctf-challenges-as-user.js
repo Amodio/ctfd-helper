@@ -43,7 +43,7 @@ export class CtfChallengesAsUser extends LitElement {
       }
       @keyframes spin-refresh {
         0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+        100% { transform: rotate(-360deg); }
       }
       .ctf-ch-row.updating {
         animation: highlight-update 0.7s linear;
