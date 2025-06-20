@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit';
-import './CtfSolvesBox.js';
+import './ctf-solves-box.js';
+import './ctf-magic-box.js';
 
 export class CtfChallenge extends LitElement {
   static properties = {
@@ -14,6 +15,7 @@ export class CtfChallenge extends LitElement {
     _solvesBoxChallengeId: { type: Number },
     _solvesBoxCtfId: { type: Number },
     flags: { type: Array },
+    showMagic: { type: Boolean },
   };
 
   static styles = css`
@@ -130,6 +132,22 @@ export class CtfChallenge extends LitElement {
       font-size: 0.95em;
       font-family: monospace;
     }
+    .magic-btn {
+      background: #494355;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 0.1em 0.2em;
+      font-size: 0.8em;
+      cursor: pointer;
+      box-shadow: 0 2px 8px #0003;
+      transition: background 0.18s, box-shadow 0.18s;
+    }
+    .magic-btn:hover {
+      background: #7d3cff;
+      color: #fff;
+      box-shadow: 0 4px 16px #7d3cff55;
+    }
   `;
 
   constructor() {
@@ -146,6 +164,7 @@ export class CtfChallenge extends LitElement {
     this._solvesBoxCtfId = null;
     this.flags = [];
     this._justSolved = false; // Track if a valid flag was just submitted
+    this.showMagic = false;
   }
 
   updated(changedProps) {
@@ -363,6 +382,19 @@ export class CtfChallenge extends LitElement {
   }
 
   render() {
+    if (this.showMagic) {
+      return html`
+        <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;background:#101615;display:flex;flex-direction:column;align-items:stretch;justify-content:stretch;margin:0;padding:0;border-radius:0;box-shadow:none;">
+          <button @click=${() => { this.showMagic = false; }}
+                  style="position:absolute;top:1.2em;right:1.7em;z-index:10001;background:#dc3545;color:#fff;border:none;border-radius:4px;padding:0em 0.3em;font-size:1.3em;cursor:pointer;box-shadow:0 2px 8px #0003;">
+            &times;
+          </button>
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;width:100vw;height:100vh;">
+            <ctf-magic-box style="width:100vw;height:100vh;background:#181c1b;border-radius:0;box-shadow:none;margin:0;padding:0;"></ctf-magic-box>
+          </div>
+        </div>
+      `;
+    }
     if (!this.open || !this.challenge) return html``;
     const ch = this.challenge;
     // Ensure UI state for each hint if present
@@ -491,7 +523,10 @@ export class CtfChallenge extends LitElement {
             ${ch.name || ch.title || 'Unnamed Challenge'}
             ${ch.attribution ? html`<span style="font-size:0.7em; color:#888; font-weight:normal; margin-left:0.7em;">by <b>${ch.attribution}</b></span>` : ''}
           </span>
-          <button class="refresh-btn" title="Refresh this challenge" @click=${() => this.fetchChallenge(true)}>🔄</button>
+          <button title="Magic" @click=${() => { this.showMagic = true; }} class="magic-btn">
+            🪄
+          </button>
+          <button class="refresh-btn" style="margin-left:0.5em;" title="Refresh this challenge" @click=${() => this.fetchChallenge(true)}>🔄</button>
           <button class="close-btn" title="Close" style="margin-left:0.5em;float:none;" @click=${() => this.close()}>&times;</button>
         </h2>
         <div class="meta">

@@ -1,5 +1,5 @@
 import { LitElement, html, css } from 'lit';
-import './CtfChallenge.js';
+import './ctf-challenge.js';
 
 export class CtfChallenges extends LitElement {
   static properties = {
