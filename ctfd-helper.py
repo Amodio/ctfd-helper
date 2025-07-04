@@ -80,14 +80,6 @@ def list_ctfs():
                 pass
     return jsonify({'ctfs': ctf_list, 'last_login': last_login})
 
-@app.route('/challenges_details/<int:ctf_id>', methods=['GET'])
-def get_all_challenge_details(ctf_id):
-    """Returns the full CTF JSON file (all details, all challenges, all fields)."""
-    ctf_data = load_ctf_cache(ctf_id)
-    if ctf_data is None:
-        return jsonify({'error': f"CTF #{ctf_id} not found"}), 404
-    return jsonify(ctf_data)
-
 @app.route('/update_token/<int:ctf_id>', methods=['POST'])
 def update_ctf_token(ctf_id):
     return jsonify({'error': 'Token update is not supported. Login/password are now used.'}), 400
