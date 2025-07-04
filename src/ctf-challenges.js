@@ -4,7 +4,7 @@ import './ctf-challenge.js';
 export class CtfChallenges extends LitElement {
   static properties = {
     ctfId: { type: Number },
-    challenges: { type: Array },
+    ctfData: { type: Object }, // Directly use the full backend JSON structure
     ctfUrl: { type: String },
     open: { type: Boolean },
     login: { type: String },
@@ -65,15 +65,11 @@ export class CtfChallenges extends LitElement {
   constructor() {
     super();
     this._ctfId = null;
-    this.challenges = [];
+    this.ctfData = null; // Will hold the full backend JSON
     this.ctfUrl = '';
     this.open = false;
     this.hideSolved = localStorage.getItem('ctf-hide-solved') === '1';
     this.selectedChallenge = null;
-    this.loadingCategory = null;
-    this.categoryChallenges = null;
-    this.categoryError = '';
-    this.challengeDetails = {};
     this.updatingChallengeId = null;
     this.isLoading = false;
     // Restore login from localStorage if available
@@ -125,44 +121,27 @@ export class CtfChallenges extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    // If last-opened-ctf is set and no challenges loaded, auto-load
+    // If last-opened-ctf is set and no data loaded, auto-load
     const last = localStorage.getItem('last-opened-ctf');
-    if (last && (this.challenges == null || this.challenges.length === 0)) {
+    if (last && !this.ctfData) {
       this.ctfId = Number(last);
-      await this.loadChallenges();
-    }
-    // After challenges are loaded, request details for all
-    if (this.challenges && this.challenges.length > 0) {
       await this.fetchAllChallengeDetails();
     }
   }
 
   async fetchAllChallengeDetails() {
-    if (!this.challenges || this.challenges.length === 0) return;
-    for (const ch of this.challenges) {
-      if (!this.challengeDetails[ch.id]) {
-        try {
-          const resp = await fetch(`/challenge/${this.ctfId}/${ch.id}`);
-          if (resp.ok) {
-            const details = await resp.json();
-            let challengeObj = details.challenge || details;
-            // If flags are present, attach them to the challenge object for immediate modal display
-            if (details.flags) {
-              challengeObj.flags = details.flags;
-            }
-            // Always set a name fallback if missing
-            if (!challengeObj.name && challengeObj.title) {
-              challengeObj.name = challengeObj.title;
-            }
-            if (!challengeObj.name) {
-              challengeObj.name = `Challenge #${ch.id}`;
-            }
-            this.challengeDetails[ch.id] = challengeObj;
-            this.requestUpdate(); // Update UI after each detail fetch
-          }
-        } catch (e) {}
+    // Fetch the full CTF JSON (all challenges, all details) in one request
+    try {
+      const resp = await fetch(`/challenges_details/${this.ctfId}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        this.ctfData = data;
+        // Set ctfUrl and ctfName if present
+        if (data.url) this.ctfUrl = data.url;
+        if (data.name) this.ctfName = data.name;
+        this.requestUpdate();
       }
-    }
+    } catch (e) {}
   }
 
   attributeChangedCallback(name, oldVal, newVal) {
@@ -171,109 +150,8 @@ export class CtfChallenges extends LitElement {
   }
 
   async loadChallenges(forceRefresh = false) {
-    if (this.ctfId === null || this.ctfId === undefined || isNaN(this.ctfId)) {
-      console.warn('Error: Invalid ctfId, aborting fetch.');
-      return;
-    }
-    // Abort any previous fetches
-    if (this._abortController) {
-      this._abortController.abort();
-    }
-    this._abortController = new AbortController();
-    const signal = this._abortController.signal;
-    this.isLoading = true;
-    this.requestUpdate();
-    try {
-      let url = `/challenges/${this.ctfId}`;
-      if (forceRefresh) {
-        url += '?refresh=1';
-      }
-      const response = await fetch(url, { signal });
-      if (!response.ok) throw new Error('Failed to fetch challenges');
-      const data = await response.json();
-      const newChallenges = data.challenges || [];
-      if (data.url) this.ctfUrl = data.url;
-      if (data.name) this.ctfName = data.name;
-      // Always restore login from selectedCtf if available, or keep the property
-      if (typeof this.selectedCtf === 'object' && this.selectedCtf && this.selectedCtf.login) {
-        this.login = this.selectedCtf.login;
-      }
-      // Only clear challengeDetails on forceRefresh, not every fetch
-      if (forceRefresh) {
-        this.challengeDetails = {};
-      }
-      // Group and sort challenges as in render
-      const grouped = {};
-      for (const ch of newChallenges) {
-        const cat = ch.category || 'Uncategorized';
-        if (!grouped[cat]) grouped[cat] = [];
-        grouped[cat].push(ch);
-      }
-      const tagOrder = ['intro', 'easy', 'medium', 'hard', 'insane'];
-      function tagRank(tags) {
-        if (!tags || !tags.length) return 999;
-        const tagVals = tags.map(t => (t.value || t).toLowerCase());
-        for (const tag of tagOrder) {
-          if (tagVals.includes(tag)) return tagOrder.indexOf(tag);
-        }
-        return 999;
-      }
-      let fetchOrder = [];
-      for (const cat in grouped) {
-        grouped[cat].sort((a, b) => tagRank(a.tags) - tagRank(b.tags));
-        grouped[cat] = grouped[cat].map(ch => {
-          if (!ch.name && ch.title) ch.name = ch.title;
-          if (!ch.name) ch.name = `Challenge #${ch.id}`;
-          return ch;
-        });
-        fetchOrder = fetchOrder.concat(grouped[cat]);
-      }
-      // Fetch details in the order of fetchOrder
-      for (const ch of fetchOrder) {
-        try {
-          let detailUrl = `/challenge/${this.ctfId}/${ch.id}`;
-          if (forceRefresh) detailUrl += '?refresh=1';
-          this.updatingChallengeId = ch.id;
-          this.requestUpdate();
-          const resp = await fetch(detailUrl, { signal });
-          if (resp.ok) {
-            const details = await resp.json();
-            let challengeObj = details.challenge || details;
-            if (details.flags) challengeObj.flags = details.flags;
-            if (!challengeObj.name && challengeObj.title) challengeObj.name = challengeObj.title;
-            if (!challengeObj.name) challengeObj.name = `Challenge #${ch.id}`;
-            if (typeof ch.solved_by_me !== 'undefined') {
-              challengeObj.solved_by_me = ch.solved_by_me;
-            }
-            this.challengeDetails[ch.id] = challengeObj;
-            if (typeof this.challengeDetails[ch.id].solved_by_me !== 'undefined') {
-              ch.solved_by_me = this.challengeDetails[ch.id].solved_by_me;
-            }
-            this.challenges = [...fetchOrder];
-            this.requestUpdate();
-          }
-          // Remove highlight after a short delay
-          await new Promise(res => setTimeout(res, 350));
-          if (this.updatingChallengeId === ch.id) {
-            this.updatingChallengeId = null;
-            this.requestUpdate();
-          }
-        } catch (e) {
-          if (e.name === 'AbortError') return; // Stop all further processing if aborted
-        }
-        if (signal.aborted) return;
-      }
-      // Final update in case some details failed
-      this.challenges = [...fetchOrder];
-      this.requestUpdate();
-    } catch (e) {
-      if (e.name === 'AbortError') return;
-      this.challenges = [];
-      alert('Failed to load challenges.');
-      this.requestUpdate();
-    }
-    this.isLoading = false;
-    this.requestUpdate();
+    // For compatibility, just re-fetch all challenge details
+    await this.fetchAllChallengeDetails();
   }
 
   close() {
@@ -284,7 +162,7 @@ export class CtfChallenges extends LitElement {
     }
     this.open = false;
     this.ctfId = null;
-    this.challenges = [];
+    this.ctfData = null;
     this.ctfUrl = '';
     // Remove last-opened-ctf so the CTF list is shown next time
     localStorage.removeItem('last-opened-ctf');
@@ -325,11 +203,14 @@ export class CtfChallenges extends LitElement {
   }
 
   render() {
-    // Group challenges by category and sort by tags
+    // Use the backend JSON structure directly
+    const ctfData = this.ctfData || {};
+    const challenges = Array.isArray(ctfData.challenge) ? ctfData.challenge : [];
+    // Group challenges by category
     const grouped = {};
     let total = 0;
     let solved = 0;
-    for (const ch of this.challenges) {
+    for (const ch of challenges) {
       const cat = ch.category || 'Uncategorized';
       if (!grouped[cat]) grouped[cat] = [];
       grouped[cat].push(ch);
@@ -347,10 +228,7 @@ export class CtfChallenges extends LitElement {
       return 999;
     }
     for (const cat in grouped) {
-      grouped[cat].sort((a, b) => {
-        return tagRank(a.tags) - tagRank(b.tags);
-      });
-      // Ensure all challenges have a name for display
+      grouped[cat].sort((a, b) => tagRank(a.tags) - tagRank(b.tags));
       grouped[cat] = grouped[cat].map(ch => {
         if (!ch.name && ch.title) ch.name = ch.title;
         if (!ch.name) ch.name = `Challenge #${ch.id}`;
@@ -360,15 +238,15 @@ export class CtfChallenges extends LitElement {
     // Compute filtered counts for hideSolved
     let filteredTotal = 0;
     let filteredSolved = 0;
-    for (const ch of this.challenges) {
+    for (const ch of challenges) {
       if (this.hideSolved && ch.solved_by_me === true) continue;
       filteredTotal++;
       if (ch.solved_by_me === true) filteredSolved++;
     }
     // Get the CTF name from the loaded CTF info (from backend)
     let ctfName = '';
-    if (typeof this.ctfName === 'string' && this.ctfName) {
-      ctfName = this.ctfName;
+    if (typeof ctfData.name === 'string' && ctfData.name) {
+      ctfName = ctfData.name;
     }
     return html`
       <div style="padding:1em; background:#0008; min-width: 350px; position:relative;">
@@ -410,7 +288,7 @@ export class CtfChallenges extends LitElement {
               // Calculate total points for solved and all challenges
               let solvedPoints = 0;
               let totalPoints = 0;
-              for (const ch of this.challenges) {
+              for (const ch of challenges) {
                 const val = Number(ch.value) || 0;
                 totalPoints += val;
                 if (ch.solved_by_me === true) solvedPoints += val;
@@ -448,8 +326,7 @@ export class CtfChallenges extends LitElement {
                     </td>
                   </tr>
                   ${visibleChs.map(ch => {
-                    // Use details from this.challengeDetails if available
-                    const details = this.challengeDetails && this.challengeDetails[ch.id] ? this.challengeDetails[ch.id] : ch;
+                    const details = ch; // Directly use the challenge object from backend
                     const isLocked = typeof details.max_attempts === 'number' && details.max_attempts > 0 && typeof details.attempts === 'number' && details.attempts >= details.max_attempts && details.solved_by_me !== true;
                     // Determine base colors
                     let baseBg = '#222';

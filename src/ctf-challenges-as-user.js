@@ -6,7 +6,7 @@ export class CtfChallengesAsUser extends LitElement {
     ctfId: { type: Number },
     userId: { type: Number },
     userName: { type: String },
-    challenges: { type: Array },
+    ctfData: { type: Object }, // Full backend JSON for this user/ctf
     ctfUrl: { type: String },
     open: { type: Boolean },
   };
@@ -63,7 +63,7 @@ export class CtfChallengesAsUser extends LitElement {
     this.ctfId = null;
     this.userId = null;
     this.userName = '';
-    this.challenges = [];
+    this.ctfData = null; // Will hold the full backend JSON for this user/ctf
     this.ctfUrl = '';
     this.open = false;
     this.hideSolved = false;
@@ -96,80 +96,31 @@ export class CtfChallengesAsUser extends LitElement {
     this.isLoading = true;
     this.requestUpdate();
     try {
-      // Fetch all challenges for the CTF
-      let url = `/challenges/${this.ctfId}`;
+      // Fetch all challenges for the CTF (full JSON)
+      let url = `/challenges_details/${this.ctfId}`;
       if (forceRefresh) {
         url += '?refresh=1';
       }
       const allResp = await fetch(url);
       if (!allResp.ok) throw new Error('Failed to fetch all challenges');
       const allData = await allResp.json();
-      this.ctfName = allData.name;
-      const allChallenges = allData.challenge || allData.data || allData.challenges || [];
       // Fetch solved challenge IDs for the user
       const solvedResp = await fetch(`/${this.ctfId}/users/${this.userId}`);
       if (!solvedResp.ok) throw new Error('Failed to fetch user solved challenges');
       const solvedData = await solvedResp.json();
       const solvedIds = new Set(solvedData.solved_ids || []);
-      // Group and sort challenges as in render
-      const grouped = {};
-      const tagOrder = ['intro', 'easy', 'medium', 'hard', 'insane'];
-      function tagRank(tags) {
-        if (!tags || !tags.length) return 999;
-        const tagVals = tags.map(t => (t.value || t).toLowerCase());
-        for (const tag of tagOrder) {
-          if (tagVals.includes(tag)) return tagOrder.indexOf(tag);
-        }
-        return 999;
-      }
-      for (const ch of allChallenges) {
-        const cat = ch.category || 'Uncategorized';
-        if (!grouped[cat]) grouped[cat] = [];
-        grouped[cat].push(ch);
-      }
-      let fetchOrder = [];
-      for (const cat in grouped) {
-        grouped[cat].sort((a, b) => tagRank(a.tags) - tagRank(b.tags));
-        grouped[cat] = grouped[cat].map(ch => {
-          if (!ch.name && ch.title) ch.name = ch.title;
-          if (!ch.name) ch.name = `Challenge #${ch.id}`;
-          return ch;
-        });
-        fetchOrder = fetchOrder.concat(grouped[cat]);
-      }
-      // Fetch details in the order of fetchOrder
-      let updatedChallenges = [];
-      for (const ch of fetchOrder) {
-        this.updatingChallengeId = ch.id;
-        this.requestUpdate();
-        try {
-          let detailUrl = `/challenge/${this.ctfId}/${ch.id}`;
-          if (forceRefresh) detailUrl += '?refresh=1';
-          const resp = await fetch(detailUrl);
-          let chDetails = ch;
-          if (resp.ok) {
-            const details = await resp.json();
-            chDetails = { ...ch, ...(details.challenge || details) };
-          }
-          chDetails.solved_by_user = solvedIds.has(ch.id);
-          updatedChallenges.push(chDetails);
-        } catch (e) {
+      // Attach solved_by_user to each challenge
+      if (Array.isArray(allData.challenge)) {
+        for (const ch of allData.challenge) {
           ch.solved_by_user = solvedIds.has(ch.id);
-          updatedChallenges.push(ch);
         }
-        // Remove highlight after a short delay
-        await new Promise(res => setTimeout(res, 350));
-        if (this.updatingChallengeId === ch.id) {
-          this.updatingChallengeId = null;
-          this.requestUpdate();
-        }
-        this.challenges = [...updatedChallenges, ...fetchOrder.slice(updatedChallenges.length)];
-        this.requestUpdate();
       }
-      this.challenges = updatedChallenges;
+      this.ctfData = allData;
+      if (allData.url) this.ctfUrl = allData.url;
+      if (allData.name) this.ctfName = allData.name;
       this.requestUpdate();
     } catch (e) {
-      this.challenges = [];
+      this.ctfData = null;
       console.error('[CtfChallengesAsUser] Failed to load user challenges.', e);
       alert('Failed to load user challenges.');
       this.requestUpdate();
@@ -179,11 +130,14 @@ export class CtfChallengesAsUser extends LitElement {
   }
 
   render() {
+    // Use the backend JSON structure directly
+    const ctfData = this.ctfData || {};
+    const challenges = Array.isArray(ctfData.challenge) ? ctfData.challenge : [];
     // Group challenges by category
     const grouped = {};
     let total = 0;
     let solved = 0;
-    for (const ch of this.challenges) {
+    for (const ch of challenges) {
       const cat = ch.category || 'Uncategorized';
       if (!grouped[cat]) grouped[cat] = [];
       grouped[cat].push(ch);
@@ -201,9 +155,7 @@ export class CtfChallengesAsUser extends LitElement {
       return 999;
     }
     for (const cat in grouped) {
-      grouped[cat].sort((a, b) => {
-        return tagRank(a.tags) - tagRank(b.tags);
-      });
+      grouped[cat].sort((a, b) => tagRank(a.tags) - tagRank(b.tags));
       grouped[cat] = grouped[cat].map(ch => {
         if (!ch.name && ch.title) ch.name = ch.title;
         if (!ch.name) ch.name = `Challenge #${ch.id}`;
@@ -211,12 +163,9 @@ export class CtfChallengesAsUser extends LitElement {
       });
     }
     let displayName = this.userName || '';
-    if (displayName) {
-      displayName = displayName;
-    }
     let ctfName = '';
-    if (typeof this.ctfName === 'string' && this.ctfName) {
-      ctfName = this.ctfName;
+    if (typeof ctfData.name === 'string' && ctfData.name) {
+      ctfName = ctfData.name;
     }
     return html`
       <div style="padding:1em; background:#0008; min-width: 350px; position:relative;">
@@ -246,7 +195,7 @@ export class CtfChallengesAsUser extends LitElement {
             ${(() => {
               let solvedPoints = 0;
               let totalPoints = 0;
-              for (const ch of this.challenges) {
+              for (const ch of challenges) {
                 const val = Number(ch.value) || 0;
                 totalPoints += val;
                 if (ch.solved_by_user === true) solvedPoints += val;
