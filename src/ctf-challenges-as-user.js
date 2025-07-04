@@ -97,13 +97,18 @@ export class CtfChallengesAsUser extends LitElement {
     this.requestUpdate();
     try {
       // Fetch all challenges for the CTF (full JSON)
-      let url = `/challenges_details/${this.ctfId}`;
+      let url = `/challenges/${this.ctfId}`;
       if (forceRefresh) {
         url += '?refresh=1';
       }
       const allResp = await fetch(url);
       if (!allResp.ok) throw new Error('Failed to fetch all challenges');
+      
       const allData = await allResp.json();
+
+      this.ctfName = allData.name;
+      const allChallenges = allData.challenge || allData.data || allData.challenges || [];
+
       // Fetch solved challenge IDs for the user
       const solvedResp = await fetch(`/${this.ctfId}/users/${this.userId}`);
       if (!solvedResp.ok) throw new Error('Failed to fetch user solved challenges');
@@ -118,7 +123,65 @@ export class CtfChallengesAsUser extends LitElement {
       this.ctfData = allData;
       if (allData.url) this.ctfUrl = allData.url;
       if (allData.name) this.ctfName = allData.name;
-      this.requestUpdate();
+      if (forceRefresh) {
+        // Group and sort challenges as in render
+        const grouped = {};
+        const tagOrder = ['intro', 'easy', 'medium', 'hard', 'insane'];
+        function tagRank(tags) {
+          if (!tags || !tags.length) return 999;
+          const tagVals = tags.map(t => (t.value || t).toLowerCase());
+          for (const tag of tagOrder) {
+            if (tagVals.includes(tag)) return tagOrder.indexOf(tag);
+          }
+          return 999;
+        }
+        for (const ch of allChallenges) {
+          const cat = ch.category || 'Uncategorized';
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat].push(ch);
+        }
+        let fetchOrder = [];
+        for (const cat in grouped) {
+          grouped[cat].sort((a, b) => tagRank(a.tags) - tagRank(b.tags));
+          grouped[cat] = grouped[cat].map(ch => {
+            if (!ch.name && ch.title) ch.name = ch.title;
+            if (!ch.name) ch.name = `Challenge #${ch.id}`;
+            return ch;
+          });
+          fetchOrder = fetchOrder.concat(grouped[cat]);
+        }
+        // Fetch details in the order of fetchOrder
+        let updatedChallenges = [];
+        for (const ch of fetchOrder) {
+          this.updatingChallengeId = ch.id;
+          this.requestUpdate();
+          try {
+            let detailUrl = `/challenge/${this.ctfId}/${ch.id}`;
+            if (forceRefresh) detailUrl += '?refresh=1';
+            const resp = await fetch(detailUrl);
+            let chDetails = ch;
+            if (resp.ok) {
+              const details = await resp.json();
+              chDetails = { ...ch, ...(details.challenge || details) };
+            }
+            chDetails.solved_by_user = solvedIds.has(ch.id);
+            updatedChallenges.push(chDetails);
+          } catch (e) {
+            ch.solved_by_user = solvedIds.has(ch.id);
+            updatedChallenges.push(ch);
+          }
+          // Remove highlight after a short delay
+          await new Promise(res => setTimeout(res, 350));
+          if (this.updatingChallengeId === ch.id) {
+            this.updatingChallengeId = null;
+            this.requestUpdate();
+          }
+          this.challenges = [...updatedChallenges, ...fetchOrder.slice(updatedChallenges.length)];
+          this.requestUpdate();
+        }
+        this.ctfData.challenges = updatedChallenges;
+        this.requestUpdate();
+      }
     } catch (e) {
       this.ctfData = null;
       console.error('[CtfChallengesAsUser] Failed to load user challenges.', e);
