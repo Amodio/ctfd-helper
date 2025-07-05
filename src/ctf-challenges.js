@@ -282,6 +282,13 @@ export class CtfChallenges extends LitElement {
     // Remove last-opened-ctf so the CTF list is shown next time
     localStorage.removeItem('last-opened-ctf');
     this.requestUpdate();
+    // Clear GET parameters from the URL (user_id, username, etc.) and refresh the window
+    if (window && window.history && window.location) {
+      const url = new URL(window.location.href);
+      url.search = '';
+      window.location.href = url.toString();
+      return;
+    }
     // Dispatch event to show the CTF list again
     this.dispatchEvent(new CustomEvent('close-ctf-challenges', { bubbles: true, composed: true }));
     // Refresh the challenge list when returning to the CTF list
