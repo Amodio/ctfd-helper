@@ -162,71 +162,72 @@ export class CtfChallenges extends LitElement {
       // Only clear challengeDetails on forceRefresh, not every fetch
       if (forceRefresh) {
         this.challengeDetails = {};
-      }
-      // Group and sort challenges as in render
-      const grouped = {};
-      for (const ch of newChallenges) {
-        const cat = ch.category || 'Uncategorized';
-        if (!grouped[cat]) grouped[cat] = [];
-        grouped[cat].push(ch);
-      }
-      const tagOrder = ['intro', 'easy', 'medium', 'hard', 'insane'];
-      function tagRank(tags) {
-        if (!tags || !tags.length) return 999;
-        const tagVals = tags.map(t => (t.value || t).toLowerCase());
-        for (const tag of tagOrder) {
-          if (tagVals.includes(tag)) return tagOrder.indexOf(tag);
+      
+        // Group and sort challenges as in render
+        const grouped = {};
+        for (const ch of newChallenges) {
+          const cat = ch.category || 'Uncategorized';
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat].push(ch);
         }
-        return 999;
-      }
-      let fetchOrder = [];
-      for (const cat in grouped) {
-        grouped[cat].sort((a, b) => tagRank(a.tags) - tagRank(b.tags));
-        grouped[cat] = grouped[cat].map(ch => {
-          if (!ch.name && ch.title) ch.name = ch.title;
-          if (!ch.name) ch.name = `Challenge #${ch.id}`;
-          return ch;
-        });
-        fetchOrder = fetchOrder.concat(grouped[cat]);
-      }
-      // Fetch details in the order of fetchOrder
-      for (const ch of fetchOrder) {
-        try {
-          let detailUrl = `/challenge/${this.ctfId}/${ch.id}`;
-          if (forceRefresh) detailUrl += '?refresh=1';
-          this.updatingChallengeId = ch.id;
-          this.requestUpdate();
-          const resp = await fetch(detailUrl, { signal });
-          if (resp.ok) {
-            const details = await resp.json();
-            let challengeObj = details.challenge || details;
-            if (details.flags) challengeObj.flags = details.flags;
-            if (!challengeObj.name && challengeObj.title) challengeObj.name = challengeObj.title;
-            if (!challengeObj.name) challengeObj.name = `Challenge #${ch.id}`;
-            if (typeof ch.solved_by_me !== 'undefined') {
-              challengeObj.solved_by_me = ch.solved_by_me;
-            }
-            this.challengeDetails[ch.id] = challengeObj;
-            if (typeof this.challengeDetails[ch.id].solved_by_me !== 'undefined') {
-              ch.solved_by_me = this.challengeDetails[ch.id].solved_by_me;
-            }
-            this.ctfData.challenges = [...fetchOrder];
-            this.requestUpdate();
+        const tagOrder = ['intro', 'easy', 'medium', 'hard', 'insane'];
+        function tagRank(tags) {
+          if (!tags || !tags.length) return 999;
+          const tagVals = tags.map(t => (t.value || t).toLowerCase());
+          for (const tag of tagOrder) {
+            if (tagVals.includes(tag)) return tagOrder.indexOf(tag);
           }
-          // Remove highlight after a short delay
-          await new Promise(res => setTimeout(res, 350));
-          if (this.updatingChallengeId === ch.id) {
-            this.updatingChallengeId = null;
-            this.requestUpdate();
-          }
-        } catch (e) {
-          if (e.name === 'AbortError') return; // Stop all further processing if aborted
+          return 999;
         }
-        if (signal.aborted) return;
+        let fetchOrder = [];
+        for (const cat in grouped) {
+          grouped[cat].sort((a, b) => tagRank(a.tags) - tagRank(b.tags));
+          grouped[cat] = grouped[cat].map(ch => {
+            if (!ch.name && ch.title) ch.name = ch.title;
+            if (!ch.name) ch.name = `Challenge #${ch.id}`;
+            return ch;
+          });
+          fetchOrder = fetchOrder.concat(grouped[cat]);
+        }
+        // Fetch details in the order of fetchOrder
+        for (const ch of fetchOrder) {
+          try {
+            let detailUrl = `/challenge/${this.ctfId}/${ch.id}`;
+            if (forceRefresh) detailUrl += '?refresh=1';
+            this.updatingChallengeId = ch.id;
+            this.requestUpdate();
+            const resp = await fetch(detailUrl, { signal });
+            if (resp.ok) {
+              const details = await resp.json();
+              let challengeObj = details.challenge || details;
+              if (details.flags) challengeObj.flags = details.flags;
+              if (!challengeObj.name && challengeObj.title) challengeObj.name = challengeObj.title;
+              if (!challengeObj.name) challengeObj.name = `Challenge #${ch.id}`;
+              if (typeof ch.solved_by_me !== 'undefined') {
+                challengeObj.solved_by_me = ch.solved_by_me;
+              }
+              this.challengeDetails[ch.id] = challengeObj;
+              if (typeof this.challengeDetails[ch.id].solved_by_me !== 'undefined') {
+                ch.solved_by_me = this.challengeDetails[ch.id].solved_by_me;
+              }
+              this.ctfData.challenges = [...fetchOrder];
+              this.requestUpdate();
+            }
+            // Remove highlight after a short delay
+            await new Promise(res => setTimeout(res, 350));
+            if (this.updatingChallengeId === ch.id) {
+              this.updatingChallengeId = null;
+              this.requestUpdate();
+            }
+          } catch (e) {
+            if (e.name === 'AbortError') return; // Stop all further processing if aborted
+          }
+          if (signal.aborted) return;
+        }
+        // Final update in case some details failed
+        this.ctfData.challenges = [...fetchOrder];
+        this.requestUpdate();
       }
-      // Final update in case some details failed
-      this.ctfData.challenges = [...fetchOrder];
-      this.requestUpdate();
     } catch (e) {
       if (e.name === 'AbortError') return;
       this.ctfData.challenges = [];
