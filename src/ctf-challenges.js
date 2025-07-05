@@ -482,9 +482,12 @@ export class CtfChallenges extends LitElement {
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333; font-weight:bold; color:#7fffd4;">
                         ${(() => {
                           const name = ch.name || ch.title || `Challenge #${ch.id}`;
-                          const attempts = typeof ch.attempts === 'number' ? ch.attempts : null;
+                          const attempts = typeof ch.attempts === 'number' && !this.hasUserName ? ch.attempts : null;
                           const maxAttempts = typeof ch.max_attempts === 'number' ? ch.max_attempts : null;
                           let attemptsSpan = '';
+                          if (this.hasUserName && typeof ch.max_attempts === 'number' && ch.max_attempts > 0) {
+                            attemptsSpan = html`<span style="color:#ff4444;">&nbsp;&nbsp;(max attempts: ${maxAttempts})</span>`;
+                          }
                           if (attempts !== null && maxAttempts !== null && maxAttempts > 0) {
                             attemptsSpan = html`<span style="color:#ff4444;">&nbsp;&nbsp;(attempts: ${attempts}/${maxAttempts})</span>`;
                           }
