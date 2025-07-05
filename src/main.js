@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import './ctf-challenges.js';
-import './ctf-challenges-as-user.js';
+
 
 export class CtfList extends LitElement {
   static properties = {
@@ -343,7 +343,14 @@ export class CtfList extends LitElement {
       const login = ctfObj && ctfObj.login ? ctfObj.login : undefined;
       console.log('[CtfList] render: ctfObj', ctfObj, 'login', login);
       return html`
-        <ctf-challenges-as-user .ctfId=${Number(ctfIdLocal)} .userId=${Number(userIdParam)} .open=${true} .login=${login}></ctf-challenges-as-user>
+        <ctf-challenges
+          .ctfId=${Number(ctfIdLocal)}
+          .userId=${Number(userIdParam)}
+          .userName=${undefined}
+          .open=${true}
+          .login=${login}
+          .userMode=${true}
+        ></ctf-challenges>
       `;
     }
     return html`

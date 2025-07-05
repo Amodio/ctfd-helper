@@ -1,4 +1,6 @@
 import { LitElement, html, css } from 'lit';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+
 import './ctf-challenge.js';
 
 export class CtfChallenges extends LitElement {
@@ -6,6 +8,8 @@ export class CtfChallenges extends LitElement {
     ctfId: { type: Number },
     ctfData: { type: Object }, // Directly use the full backend JSON structure
     ctfUrl: { type: String },
+    userId: { type: Number },
+    userName: { type: String },
     open: { type: Boolean },
     login: { type: String },
   };
@@ -67,6 +71,8 @@ export class CtfChallenges extends LitElement {
     this._ctfId = null;
     this.ctfData = null; // Will hold the full backend JSON
     this.ctfUrl = '';
+    this.userId = null;
+    this.userName = '';
     this.open = false;
     this.hideSolved = localStorage.getItem('ctf-hide-solved') === '1';
     this.selectedChallenge = null;
@@ -121,18 +127,27 @@ export class CtfChallenges extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    // If last-opened-ctf is set and no data loaded, auto-load
-    const last = localStorage.getItem('last-opened-ctf');
-    if (last && !this.ctfData) {
-      this.ctfId = Number(last);
+    // Get ctfId from localStorage and userId/username from URL parameters (?user_id=...&username=...)
+    const params = new URLSearchParams(window.location.search);
+    const userId = params.get('user_id');
+    const hasUserName = params.get('username');
+    const userName = hasUserName || this.login;
+    const ctfId = localStorage.getItem('last-opened-ctf');
+    if (ctfId) {
+      this.ctfId = Number(ctfId);
+      this.userId = Number(userId);
+      this.userName = userName || `User #${userId}`;
+      this.hasUserName = hasUserName;
       await this.loadChallenges();
+    } else {
+      console.warn('[CtfChallengesAsUser] Missing ctfId or userId', { ctfId, userId });
     }
   }
 
   async loadChallenges(forceRefresh = false) {
     // Fetch the full CTF JSON (all challenges, all details) in one request
-    if (this.ctfId === null || this.ctfId === undefined || isNaN(this.ctfId)) {
-      console.warn('Error: Invalid ctfId, aborting fetch.');
+    if (this.ctfId === null || this.ctfId === undefined || this.userId === null || this.userId === undefined) {
+      console.warn('[CtfChallengesAsUser] loadChallenges: missing ctfId or userId', { ctfId: this.ctfId, userId: this.userId });
       return;
     }
     // Abort any previous fetches
@@ -150,11 +165,11 @@ export class CtfChallenges extends LitElement {
       }
       const response = await fetch(url, { signal });
       if (!response.ok) throw new Error('Failed to fetch challenges');
-      const data = await response.json();
-      this.ctfData = data;
-      const newChallenges = data.challenges || [];
-      if (data.url) this.ctfUrl = data.url;
-      if (data.name) this.ctfName = data.name;
+      this.ctfData  = await response.json();
+
+      const newChallenges = this.ctfData.challenges || [];
+      if (this.ctfData.url) this.ctfUrl = this.ctfData.url;
+      if (this.ctfData.name) this.ctfName = this.ctfData.name;
       // Always restore login from selectedCtf if available, or keep the property
       if (typeof this.selectedCtf === 'object' && this.selectedCtf && this.selectedCtf.login) {
         this.login = this.selectedCtf.login;
@@ -199,15 +214,9 @@ export class CtfChallenges extends LitElement {
             const resp = await fetch(detailUrl, { signal });
             if (resp.ok) {
               const details = await resp.json();
-              let challengeObj = details.challenge || details;
-              if (details.flags) challengeObj.flags = details.flags;
-              if (!challengeObj.name && challengeObj.title) challengeObj.name = challengeObj.title;
-              if (!challengeObj.name) challengeObj.name = `Challenge #${ch.id}`;
-              if (typeof ch.solved_by_me !== 'undefined') {
-                challengeObj.solved_by_me = ch.solved_by_me;
-              }
-              this.challengeDetails[ch.id] = challengeObj;
-              if (typeof this.challengeDetails[ch.id].solved_by_me !== 'undefined') {
+              
+              this.challengeDetails[ch.id] = details.challenge;
+              if (!this.hasUserName && typeof this.challengeDetails[ch.id].solved_by_me !== 'undefined') {
                 ch.solved_by_me = this.challengeDetails[ch.id].solved_by_me;
               }
               this.ctfData.challenges = [...fetchOrder];
@@ -228,6 +237,28 @@ export class CtfChallenges extends LitElement {
         this.ctfData.challenges = [...fetchOrder];
         this.requestUpdate();
       }
+
+
+      if(this.hasUserName) {
+        console.log('[CtfChallengesAsUser] Fetching solved challenges for userId:', this.userId);
+        // Fetch solved challenge IDs for the userId
+        const solvedResp = await fetch(`/${this.ctfId}/users/${this.userId}`);
+        if (!solvedResp.ok) throw new Error('Failed to fetch user solved challenges');
+        const solvedData = await solvedResp.json();
+        const solvedIds = new Set(solvedData.solved_ids || []);
+        // Attach solved_by_me to each challenge
+        if (Array.isArray(this.ctfData.challenges)) {
+          for (const ch of this.ctfData.challenges) {
+            ch.solved_by_me = solvedIds.has(ch.id);
+          }
+        }
+        if (Array.isArray(this.ctfData.challenge)) {
+          for (const ch of this.ctfData.challenge) {
+            ch.solved_by_me = solvedIds.has(ch.id);
+          }
+        }
+      }
+        
     } catch (e) {
       if (e.name === 'AbortError') return;
       this.ctfData.challenges = [];
@@ -328,6 +359,7 @@ export class CtfChallenges extends LitElement {
       if (ch.solved_by_me === true) filteredSolved++;
     }
     // Get the CTF name from the loaded CTF info (from backend)
+    let displayName = this.userName ? this.userName : this.login;
     let ctfName = '';
     if (typeof ctfData.name === 'string' && ctfData.name) {
       ctfName = ctfData.name;
@@ -365,11 +397,10 @@ export class CtfChallenges extends LitElement {
           >${this.hideSolved ? '🙈' : '🐵'}</span>
         </div>
         <h2 style="margin-bottom:0.5em; display: flex; align-items: center; justify-content: center; gap: 0.7em; flex-wrap: wrap; text-align: center;">
-          ${this.login ? html`<span class="ctf-login">${this.login}</span>` : ''}
+          ${displayName ? html`<span class="ctf-login">${unsafeHTML(displayName)}</span>` : ''}
           <span style="font-size:0.9em; color:#555;">
             ${solved}/${total} solved (${total > 0 ? Math.round((solved/total)*100) : 0}%)
             ${(() => {
-              // Calculate total points for solved and all challenges
               let solvedPoints = 0;
               let totalPoints = 0;
               for (const ch of challenges) {
@@ -410,14 +441,13 @@ export class CtfChallenges extends LitElement {
                     </td>
                   </tr>
                   ${visibleChs.map(ch => {
-                    const details = ch; // Directly use the challenge object from backend
-                    const isLocked = typeof details.max_attempts === 'number' && details.max_attempts > 0 && typeof details.attempts === 'number' && details.attempts >= details.max_attempts && details.solved_by_me !== true;
+                    const isLocked = typeof ch.max_attempts === 'number' && ch.max_attempts > 0 && typeof ch.attempts === 'number' && ch.attempts >= ch.max_attempts && ch.solved_by_me !== true;
                     // Determine base colors
                     let baseBg = '#222';
                     let baseColor = '#e0ffe0';
                     let hoverBg = '#295c29';
                     let hoverColor = '#b6ffb6';
-                    if (details.solved_by_me) {
+                    if (ch.solved_by_me) {
                       baseBg = '#1a3a1a';
                       baseColor = '#7fff7f';
                       hoverBg = '#2e5c2e';
@@ -430,9 +460,9 @@ export class CtfChallenges extends LitElement {
                       hoverColor = '#aaa';
                     }
                     return html`
-                    <tr class="ctf-ch-row ${details.solved_by_me ? 'solved' : 'unsolved'}${this.updatingChallengeId === ch.id ? ' updating' : ''}"
+                    <tr class="ctf-ch-row ${ch.solved_by_me ? 'solved' : 'unsolved'}${this.updatingChallengeId === ch.id ? ' updating' : ''}"
                       style="background-color:${baseBg}; color:${baseColor}; transition:background-color 0.2s; opacity:${isLocked ? 0.5 : 1};cursor:pointer;"
-                      @click=${() => { this.openChallenge(details); }}
+                      @click=${() => { this.openChallenge(ch); }}
                       @mouseover=${function(e){
                         if (!isLocked) {
                           e.currentTarget.style.backgroundColor = hoverBg;
@@ -445,15 +475,15 @@ export class CtfChallenges extends LitElement {
                       }}
                     >
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333;">
-                        ${details.solved_by_me === true
+                        ${ch.solved_by_me === true
                           ? html`<span style='color:#7fff7f; font-size:1.5em; margin-left:0.2em;'>✔</span>`
                           : html`<span style='color:#ff7f7f; font-size:1.5em; margin-left:0.2em;'>✗</span>`}
                       </td>
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333; font-weight:bold; color:#7fffd4;">
                         ${(() => {
-                          const name = details.name || details.title || `Challenge #${details.id}`;
-                          const attempts = typeof details.attempts === 'number' ? details.attempts : null;
-                          const maxAttempts = typeof details.max_attempts === 'number' ? details.max_attempts : null;
+                          const name = ch.name || ch.title || `Challenge #${ch.id}`;
+                          const attempts = typeof ch.attempts === 'number' ? ch.attempts : null;
+                          const maxAttempts = typeof ch.max_attempts === 'number' ? ch.max_attempts : null;
                           let attemptsSpan = '';
                           if (attempts !== null && maxAttempts !== null && maxAttempts > 0) {
                             attemptsSpan = html`<span style="color:#ff4444;">&nbsp;&nbsp;(attempts: ${attempts}/${maxAttempts})</span>`;
@@ -468,14 +498,14 @@ export class CtfChallenges extends LitElement {
                       </td>
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333; color:#aaa; text-align:center;">
                         ${isLocked
-                          ? html`<del>${details.tags && details.tags.length ? details.tags.map(t => html`<span class="ctf-tag" data-tag="${(t.value || t).toLowerCase()}">${t.value || t}</span>`) : ''}</del>`
-                          : (details.tags && details.tags.length ? details.tags.map(t => html`<span class="ctf-tag" data-tag="${(t.value || t).toLowerCase()}">${t.value || t}</span>`) : '')}
+                          ? html`<del>${ch.tags && ch.tags.length ? ch.tags.map(t => html`<span class="ctf-tag" data-tag="${(t.value || t).toLowerCase()}">${t.value || t}</span>`) : ''}</del>`
+                          : (ch.tags && ch.tags.length ? ch.tags.map(t => html`<span class="ctf-tag" data-tag="${(t.value || t).toLowerCase()}">${t.value || t}</span>`) : '')}
                       </td>
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333; color:#ffd700; text-align:center;">
-                        ${isLocked ? html`<del>${details.value || ''}</del>` : (details.value || '')}
+                        ${isLocked ? html`<del>${ch.value || ''}</del>` : (ch.value || '')}
                       </td>
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333; color:#b0e0e6; text-align:center;">
-                        ${isLocked ? html`<del>${typeof details.solves === 'number' ? details.solves : ''}</del>` : (typeof details.solves === 'number' ? details.solves : '')}
+                        ${isLocked ? html`<del>${typeof ch.solves === 'number' ? ch.solves : ''}</del>` : (typeof ch.solves === 'number' ? ch.solves : '')}
                       </td>
                     </tr>
                   `})}
