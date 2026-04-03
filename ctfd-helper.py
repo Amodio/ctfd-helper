@@ -7,6 +7,8 @@ from datetime import datetime
 import requests
 import webbrowser
 import sys
+import hashlib
+import struct
 
 app = Flask(__name__)
 DATA_DIR = 'data'
@@ -240,38 +242,95 @@ def serve_static(path):
     """Serves static files from the frontend directory."""
     return send_from_directory(FRONTEND_DIR, path)
 
+def solve_pow(token_b64: str, difficulty: int) -> int:
+    """Brute-force the PoW: find nonce s.t. SHA-256(token||nonce_le64) has `difficulty` leading zero bits."""
+    # Decode base64url
+    import base64
+    padding = 4 - len(token_b64) % 4
+    token_bytes = base64.urlsafe_b64decode(token_b64 + '=' * (padding % 4))
+
+    nonce = 0
+    while True:
+        data = token_bytes + struct.pack('<Q', nonce)
+        digest = hashlib.sha256(data).digest()
+        # Count leading zero bits
+        zeros = 0
+        for byte in digest:
+            if byte == 0:
+                zeros += 8
+            else:
+                for bit in range(7, -1, -1):
+                    if (byte >> bit) & 1 == 0:
+                        zeros += 1
+                    else:
+                        break
+                break
+        if zeros >= difficulty:
+            return nonce
+        nonce += 1
+
 def fetch_session_token(url, login, password, ctf_data=None, ctf_id=None):
-    """Fetch session token from CTFd using login and password. If ctf_data and ctf_id are provided, update the cache if the token changes."""
+    """Fetch session token from CTFd, handling PoW challenges if present."""
     print(f"[DBG] Fetching session token for CTF @ {url} with login {login}")
     try:
+        import re
         s = requests.Session()
-        # Get CSRF token from login page
+
+        # --- Step 1: Check if PoW is required ---
         r = s.get(f"{url}/login", timeout=60)
         if not r.ok:
             return None, f"Failed to load login page: {r.status_code} {r.text}"
-        import re
-        # Updated regex: match both single and double quotes, allow whitespace/newlines
-        m = re.search(r"['\"]csrfNonce['\"]\s*:\s*['\"]([a-fA-F0-9]{64})['\"]", r.text)
+
+        # If we got the PoW page instead of the real login page
+        if '/pow/challenge' in r.text or 'pow-card' in r.text:
+            print(f"[DBG] PoW challenge detected, solving...")
+
+            # Fetch the PoW challenge
+            pow_r = s.get(f"{url}/pow/challenge", timeout=60)
+            if not pow_r.ok:
+                return None, f"Failed to fetch PoW challenge: {pow_r.status_code}"
+            pow_data = pow_r.json()
+            token = pow_data.get('token')
+            difficulty = pow_data.get('difficulty')
+            if not token or difficulty is None:
+                return None, "Invalid PoW challenge payload"
+
+            print(f"[DBG] Solving PoW with difficulty={difficulty}...")
+            nonce = solve_pow(token, difficulty)
+            print(f"[DBG] PoW solved, nonce={nonce}")
+
+            # Submit the proof
+            verify_r = s.post(
+                f"{url}/pow/verify",
+                json={"token": token, "nonce": nonce},
+                timeout=60
+            )
+            if not verify_r.ok or verify_r.json().get('ok') is not True:
+                return None, f"PoW verification failed: {verify_r.status_code} {verify_r.text}"
+
+            # Now fetch the real login page
+            r = s.get(f"{url}/login", timeout=60)
+            if not r.ok:
+                return None, f"Failed to load login page after PoW: {r.status_code}"
+
+        # --- Step 2: Extract csrfNonce from the real login page ---
+        m = re.search(r"['\"](?:csrfNonce|session)['\"]\s*:\s*['\"]([a-fA-F0-9]{64})['\"]", r.text)
         if not m:
+            print(r.text)
             return None, "Could not find csrfNonce in login page."
         csrf_nonce = m.group(1)
-        # Send as form data, not JSON
-        payload = {
-            'name': login,
-            'password': password,
-            'nonce': csrf_nonce
-        }
-        headers = {
-            'Csrf-Token': csrf_nonce
-        }
+
+        # --- Step 3: Login ---
+        payload = {'name': login, 'password': password, 'nonce': csrf_nonce}
+        headers = {'Csrf-Token': csrf_nonce}
         r = s.post(f"{url}/login", data=payload, headers=headers, timeout=60)
         if not r.ok:
             return None, f"Login failed: {r.status_code} {r.text}"
-        # Session cookie is set in the session
+
         session_cookie = s.cookies.get('session')
         if not session_cookie:
             return None, "Session cookie not found after login."
-        # If ctf_data and ctf_id are provided, update the cache if token changed
+
         if ctf_data is not None and ctf_id is not None:
             if ctf_data.get('token') != session_cookie:
                 ctf_data['token'] = session_cookie
