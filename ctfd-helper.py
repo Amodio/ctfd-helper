@@ -790,5 +790,7 @@ if __name__ == '__main__':
         sys.exit(1)
     # Create DATA_DIR if needed
     os.makedirs(DATA_DIR, exist_ok=True)
+    from werkzeug.serving import make_server
+    server = make_server('127.0.0.1', 5000, app)
     webbrowser.open('http://127.0.0.1:5000', new=1)
-    app.run(debug=False)
+    server.serve_forever()
