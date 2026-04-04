@@ -167,31 +167,6 @@ export class CtfChallenge extends LitElement {
     this.showMagic = false;
   }
 
-  updated(changedProps) {
-    // Only fetch if ctfId or challenge.id changed, not on every challenge object update
-    // Instead, only fetch if challenge is missing details (e.g., description is missing)
-    if (
-      this.open &&
-      this.challenge &&
-      (
-        !this.challenge.description ||
-        typeof this.challenge.value === 'undefined' ||
-        typeof this.challenge.max_attempts === 'undefined'
-      )
-    ) {
-      // Only fetch if essential details are missing
-      this.fetchChallenge(false);
-    }
-    // Ensure flags are loaded from challenge object if present
-    if (this.challenge) {
-      if (Array.isArray(this.flags)) {
-        this.challenge.flags = this.flags;
-      } else {
-        this.flags = Array.isArray(this.challenge.flags) ? this.challenge.flags : [];
-      }
-    }
-  }
-
   async fetchChallenge(forceRefresh = false) {
     // Always get the latest values from the element's properties
     const ctfId = this.ctfId;
@@ -308,7 +283,9 @@ export class CtfChallenge extends LitElement {
           this.flags[idx].state = 'valid';
           // Ensure reactivity
           this.challenge = { ...ch, solved_by_me: true };
-          this._justSolved = true; // Mark that a valid flag was just submitted
+          this._justSolved = true;
+          // Immediately refresh the challenge list in the background
+          this.dispatchEvent(new CustomEvent('refresh-challenges', { bubbles: true, composed: true }));
         } else if (result.data.data[0].status === 'incorrect') {
           this.flags[idx].state = 'invalid';
         } else {

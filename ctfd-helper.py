@@ -131,6 +131,10 @@ def get_challenges(ctf_id):
         challenges, err_msg = fetch_challenge_list(url, login, password, ctf_data, ctf_id)
         if challenges is None or err_msg:
             return jsonify({'error': err_msg}), 404
+        old_solved = {str(ch.get('id')) for ch in (ctf_data.get('challenges') or []) if ch.get('solved_by_me')}
+        for ch in challenges:
+            if str(ch.get('id')) in old_solved:
+                ch['solved_by_me'] = True
         ctf_data['challenges'] = challenges
         if update_ctf_cache(ctf_id, ctf_data) == False:
             return jsonify({'error': 'Failed to update CTF data'}), 500
@@ -177,11 +181,8 @@ def get_challenge(ctf_id, chall_id):
     ctf_data = load_ctf_cache(ctf_id)
     if ctf_data is None:
         return jsonify({'error': f"CTF #{ctf_id} not found"}), 404
-    if ctf_data.get('challenge') is None:
-        refresh = True  # Force refresh if no challenge data is cached
-    elif not any(str(ch.get('id')) == str(chall_id) for ch in ctf_data.get('challenge', [])):
-        # If the challenge with chall_id is not in the cached list, force refresh
-        refresh = True
+    if ctf_data.get('challenge') is None or not any(str(ch.get('id')) == str(chall_id) for ch in ctf_data.get('challenge', [])):
+        refresh = True  # Force refresh only if this specific challenge is not cached
     url = ctf_data.get('url')
     login = ctf_data.get('login')
     password = ctf_data.get('password')
@@ -457,9 +458,15 @@ def test_flag(ctf_id, chall_id, flag_id):
             status = data[0].get('status')
             if status == 'correct':
                 flag_obj['state'] = 'valid'
-                # After a correct flag, force refresh the challenge list in the backend
-                # (Set a flag in ctf_data to trigger refresh on next /challenges/<ctf_id> call)
-                ctf_data['challenges'] = None
+                # Mark the challenge as solved in both caches (list and detail)
+                for ch in (ctf_data.get('challenges') or []):
+                    if str(ch.get('id')) == str(chall_id):
+                        ch['solved_by_me'] = True
+                        break
+                for ch in (ctf_data.get('challenge') or []):
+                    if str(ch.get('id')) == str(chall_id):
+                        ch['solved_by_me'] = True
+                        break
             elif status == 'incorrect':
                 flag_obj['state'] = 'invalid'
             # Update ctf_data['flags'] with the modified flag_obj

@@ -146,8 +146,8 @@ export class CtfChallenges extends LitElement {
 
   async loadChallenges(forceRefresh = false) {
     // Fetch the full CTF JSON (all challenges, all details) in one request
-    if (this.ctfId === null || this.ctfId === undefined || this.userId === null || this.userId === undefined) {
-      console.warn('[CtfChallengesAsUser] loadChallenges: missing ctfId or userId', { ctfId: this.ctfId, userId: this.userId });
+    if (this.ctfId === null || this.ctfId === undefined) {
+      console.warn('[CtfChallengesAsUser] loadChallenges: missing ctfId', { ctfId: this.ctfId });
       return;
     }
     // Abort any previous fetches
@@ -309,17 +309,16 @@ export class CtfChallenges extends LitElement {
   }
 
   closeChallenge() {
-    // Just close the modal, do not refresh here
     this.selectedChallenge = null;
+    this.loadChallenges();
     this.requestUpdate();
   }
 
   firstUpdated() {
     // Listen for refresh-challenges event from ctf-challenge
     this.addEventListener('refresh-challenges', (e) => {
-      // Always refresh and close modal when event is received
-      this.selectedChallenge = null;
-      this.loadChallenges(true);
+      // Refresh the list in the background without closing the modal
+      this.loadChallenges();
       this.requestUpdate();
     });
   }
@@ -327,7 +326,7 @@ export class CtfChallenges extends LitElement {
   render() {
     // Use the backend JSON structure directly
     const ctfData = this.ctfData || {};
-    const challenges = Array.isArray(ctfData.challenge) ? ctfData.challenge : [];
+    const challenges = Array.isArray(ctfData.challenges) ? ctfData.challenges : (Array.isArray(ctfData.challenge) ? ctfData.challenge : []);
     // Group challenges by category
     const grouped = {};
     let total = 0;
