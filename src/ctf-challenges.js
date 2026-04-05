@@ -310,15 +310,30 @@ export class CtfChallenges extends LitElement {
 
   closeChallenge() {
     this.selectedChallenge = null;
-    this.loadChallenges();
     this.requestUpdate();
   }
 
   firstUpdated() {
-    // Listen for refresh-challenges event from ctf-challenge
-    this.addEventListener('refresh-challenges', (e) => {
-      // Refresh the list in the background without closing the modal
-      this.loadChallenges();
+    // Mark challenge as solved in the list when a correct flag is tested
+    this.addEventListener('challenge-solved', (e) => {
+      const { challengeId } = e.detail;
+      const challenges = (this.ctfData && this.ctfData.challenges) || [];
+      const ch = challenges.find(c => c.id === challengeId);
+      if (ch) {
+        ch.solved_by_me = true;
+        this.ctfData = { ...this.ctfData, challenges: [...challenges] };
+      }
+      this.requestUpdate();
+    });
+    // Update flag status in the list whenever flags change inside an open challenge
+    this.addEventListener('challenge-flags-changed', (e) => {
+      const { challengeId, flags } = e.detail;
+      const challenges = (this.ctfData && this.ctfData.challenges) || [];
+      const ch = challenges.find(c => c.id === challengeId);
+      if (ch) {
+        ch.has_pending_flags = flags.some(f => f.state === 'untested');
+        this.ctfData = { ...this.ctfData, challenges: [...challenges] };
+      }
       this.requestUpdate();
     });
   }
@@ -483,7 +498,9 @@ export class CtfChallenges extends LitElement {
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333;">
                         ${ch.solved_by_me === true
                           ? html`<span style='color:#7fff7f; font-size:1.5em; margin-left:0.2em;'>✔</span>`
-                          : html`<span style='color:#ff7f7f; font-size:1.5em; margin-left:0.2em;'>✗</span>`}
+                          : ch.has_pending_flags
+                            ? html`<span style='font-size:1.5em; margin-left:0.2em;' title="You have a flag to submit">❔</span>`
+                            : html`<span style='color:#ff7f7f; font-size:1.5em; margin-left:0.2em;'>✗</span>`}
                       </td>
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333; font-weight:bold; color:#7fffd4;">
                         ${(() => {

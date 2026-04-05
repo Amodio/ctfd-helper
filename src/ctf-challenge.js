@@ -204,13 +204,15 @@ export class CtfChallenge extends LitElement {
     }
   }
 
+  _dispatchFlagsChanged() {
+    this.dispatchEvent(new CustomEvent('challenge-flags-changed', {
+      bubbles: true, composed: true,
+      detail: { challengeId: this.challenge && this.challenge.id, flags: this.flags || [] }
+    }));
+  }
+
   close() {
     this.open = false;
-    // Only refresh parent if a valid flag was just submitted
-    if (this._justSolved) {
-      this.dispatchEvent(new CustomEvent('refresh-challenges', { bubbles: true, composed: true }));
-      this._justSolved = false;
-    }
     this.dispatchEvent(new CustomEvent('close-ctf-challenge', { bubbles: true, composed: true }));
   }
 
@@ -249,6 +251,7 @@ export class CtfChallenge extends LitElement {
     this.flags = [...this.flags, newFlag];
     this.flagDraft = '';
     this.challenge = { ...ch, flags: this.flags };
+    this._dispatchFlagsChanged();
     this.requestUpdate();
   }
 
@@ -283,9 +286,10 @@ export class CtfChallenge extends LitElement {
           this.flags[idx].state = 'valid';
           // Ensure reactivity
           this.challenge = { ...ch, solved_by_me: true };
-          this._justSolved = true;
-          // Immediately refresh the challenge list in the background
-          this.dispatchEvent(new CustomEvent('refresh-challenges', { bubbles: true, composed: true }));
+          this.dispatchEvent(new CustomEvent('challenge-solved', {
+            bubbles: true, composed: true,
+            detail: { challengeId: ch.id }
+          }));
         } else if (result.data.data[0].status === 'incorrect') {
           this.flags[idx].state = 'invalid';
         } else {
@@ -296,6 +300,7 @@ export class CtfChallenge extends LitElement {
       }
       if (this.flags[idx].state === 'valid' || this.flags[idx].state === 'invalid') {
         this.error_str = '';
+        this._dispatchFlagsChanged();
         this.requestUpdate();
       } else {
         this.requestUpdate();
@@ -318,6 +323,7 @@ export class CtfChallenge extends LitElement {
     }
     this.flags.splice(idx, 1);
     this.challenge = { ...ch, flags: this.flags };
+    this._dispatchFlagsChanged();
     this.requestUpdate();
   }
 
@@ -332,6 +338,7 @@ export class CtfChallenge extends LitElement {
       if (resp.ok && data.success) {
         this.flags = [];
         this.challenge = { ...this.challenge, flags: [] };
+        this._dispatchFlagsChanged();
         this.requestUpdate();
       } else {
         alert('Failed to delete flags: ' + (data.error || resp.statusText));
