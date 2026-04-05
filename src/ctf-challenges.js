@@ -62,7 +62,7 @@ export class CtfChallenges extends LitElement {
       }
       @keyframes spin-refresh {
         0% { transform: rotate(0deg); }
-        100% { transform: rotate(-360deg); }
+        100% { transform: rotate(360deg); }
       }
     `
   ];
@@ -412,11 +412,10 @@ export class CtfChallenges extends LitElement {
               🔙
             </button>
             <button
-              title="Refresh all challenges"
+              title="${this.isLoading ? 'Stop refresh' : 'Refresh all challenges'}"
               class="refresh-btn${this.isLoading ? ' spinning' : ''}"
               style="font-size:1.6em; border: none; border-radius: 4px; background: rgb(16, 22, 21); padding: 0em 0em; cursor: pointer;"
-              @click=${() => this.loadChallenges(true)}
-              ?disabled=${this.isLoading}
+              @click=${() => { if (this.isLoading && this._abortController) { this._abortController.abort(); this.isLoading = false; this.requestUpdate(); } else { this.loadChallenges(true); } }}
             >🔄</button>
           </div>
           <div style="flex:2 1 0; display:flex; justify-content:center; align-items:center;">
