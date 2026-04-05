@@ -250,7 +250,9 @@ export class CtfChallenge extends LitElement {
     if (newFlagId !== null && newFlagId !== undefined) newFlag.id = newFlagId;
     this.flags = [...this.flags, newFlag];
     this.flagDraft = '';
-    this.challenge = { ...ch, flags: this.flags };
+    // Re-read this.challenge after the await: fetchChallenge() may have completed
+    // in the meantime and populated the full description; don't overwrite it with stale ch.
+    this.challenge = { ...this.challenge, flags: this.flags };
     this._dispatchFlagsChanged();
     this.requestUpdate();
   }
@@ -350,7 +352,22 @@ export class CtfChallenge extends LitElement {
 
   set challenge(val) {
     const old = this._challenge;
-    this._challenge = val;
+    // Merge incoming value with existing data so that a shallow list-item re-binding
+    // from the parent (which lacks description/files/hints) doesn't wipe what
+    // fetchChallenge already populated. The backend-fetched fields win; incoming
+    // fields only fill gaps or update known-light fields (id, name, value, …).
+    if (val && old && val.id === old.id) {
+      const richFields = ['description', 'files', 'hints', 'connection_info', 'flags'];
+      const merged = { ...val };
+      for (const f of richFields) {
+        if (old[f] !== undefined && (val[f] === undefined || val[f] === null || (Array.isArray(val[f]) && val[f].length === 0 && Array.isArray(old[f]) && old[f].length > 0))) {
+          merged[f] = old[f];
+        }
+      }
+      this._challenge = merged;
+    } else {
+      this._challenge = val;
+    }
     this.requestUpdate('challenge', old);
   }
   get challenge() {

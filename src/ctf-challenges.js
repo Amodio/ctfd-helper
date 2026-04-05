@@ -12,6 +12,7 @@ export class CtfChallenges extends LitElement {
     userName: { type: String },
     open: { type: Boolean },
     login: { type: String },
+    slowRefresh: { type: Number },
   };
 
   static styles = [
@@ -78,6 +79,7 @@ export class CtfChallenges extends LitElement {
     this.selectedChallenge = null;
     this.updatingChallengeId = null;
     this.isLoading = false;
+    this.slowRefresh = 0;
     // Restore login from localStorage if available
     const loginLocal = localStorage.getItem('last-ctf-login');
     if (loginLocal) {
@@ -165,7 +167,22 @@ export class CtfChallenges extends LitElement {
       }
       const response = await fetch(url, { signal });
       if (!response.ok) throw new Error('Failed to fetch challenges');
+      const prevChallenges = (this.ctfData && this.ctfData.challenges) || [];
       this.ctfData  = await response.json();
+
+      // Re-apply transient client-side state (pending flags, solved) onto freshly fetched challenges
+      const prevById = {};
+      for (const ch of prevChallenges) prevById[ch.id] = ch;
+      const reapplyTransientState = (challenges) => {
+        for (const ch of challenges || []) {
+          const prev = prevById[ch.id];
+          if (prev) {
+            if (prev.has_pending_flags) ch.has_pending_flags = prev.has_pending_flags;
+            if (prev.solved_by_me === true) ch.solved_by_me = true;
+          }
+        }
+      };
+      reapplyTransientState(this.ctfData.challenges);
 
       const newChallenges = this.ctfData.challenges || [];
       if (this.ctfData.url) this.ctfUrl = this.ctfData.url;
@@ -219,11 +236,12 @@ export class CtfChallenges extends LitElement {
               if (!this.hasUserName && typeof this.challengeDetails[ch.id].solved_by_me !== 'undefined') {
                 ch.solved_by_me = this.challengeDetails[ch.id].solved_by_me;
               }
+              reapplyTransientState(fetchOrder);
               this.ctfData.challenges = [...fetchOrder];
               this.requestUpdate();
             }
-            // Remove highlight after a short delay
-            await new Promise(res => setTimeout(res, 350));
+            // Remove highlight after a short delay; add extra pacing when slowRefresh is on
+            await new Promise(res => setTimeout(res, 350 + (Number(this.slowRefresh) || 0)));
             if (this.updatingChallengeId === ch.id) {
               this.updatingChallengeId = null;
               this.requestUpdate();
@@ -234,6 +252,7 @@ export class CtfChallenges extends LitElement {
           if (signal.aborted) return;
         }
         // Final update in case some details failed
+        reapplyTransientState(fetchOrder);
         this.ctfData.challenges = [...fetchOrder];
         this.requestUpdate();
       }

@@ -330,6 +330,27 @@ export class CtfList extends LitElement {
     }
   }
 
+  _getRefreshDelay(ctf) {
+    // Use server-stored value if present, otherwise default based on name
+    if (ctf.refresh_delay !== null && ctf.refresh_delay !== undefined) return Number(ctf.refresh_delay);
+    return /fcsc/i.test(ctf.name || '') ? 1000 : 0;
+  }
+
+  async _setRefreshDelay(ctfId, value) {
+    // Find and update ctf in local list immediately for responsive UI
+    const ctf = this.ctfs.find(c => c.id === ctfId);
+    if (ctf) ctf.refresh_delay = Number(value) || 0;
+    this.requestUpdate();
+    // Persist to server
+    try {
+      await fetch(`/ctf/${ctfId}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_delay: Number(value) || 0 })
+      });
+    } catch {}
+  }
+
   render() {
     const showList = !this.selectedCtf;
     // Check for user_id in URL parameters and use ctfId from localStorage
@@ -380,10 +401,17 @@ export class CtfList extends LitElement {
         ${showList && !this.showForm ? html`
           <ul style="display: flex; flex-direction: column; align-items: center; padding: 0;">
             ${this.ctfs.map(ctf => html`
-              <li style="width: 100%; max-width: 400px; display: flex; justify-content: center; align-items: center;">
+              <li style="width: 100%; max-width: 500px; display: flex; justify-content: center; align-items: center; gap: 0.4em;">
                 <button @click=${() => this.showChallenges(ctf)}><span class="ctf-list-name">${ctf.name}</span></button>
-                <button style="margin-left:0.5em;background:#ffc107;color:#222;" @click=${() => this.editCredentials(ctf)}>Edit Credentials</button>
-                <button title="Delete this CTF" style="margin-left:0.5em;background:#b52a37;color:#fff; border:none; border-radius:4px; font-size:1.1em; padding:0.3em 0.7em; cursor:pointer;" @click=${() => this.deleteCtf(ctf.id)}>🗑️</button>
+                <button style="background:#ffc107;color:#222;" @click=${() => this.editCredentials(ctf)}>Edit Credentials</button>
+                <label title="Delay between requests during refresh (ms). Set to 0 to disable. Defaults to 1000ms for FCSC CTFs." style="display:flex;align-items:center;gap:0.3em;color:#aaa;font-size:0.9em;white-space:nowrap;user-select:none;">
+                  🐢<input type="number" min="0" max="10000" step="100"
+                    style="width:5em;background:#181c1b;color:#e0ffe0;border:1px solid #444;border-radius:4px;padding:0.15em 0.3em;font-family:monospace;font-size:0.95em;"
+                    .value=${String(this._getRefreshDelay(ctf))}
+                    @change=${e => { e.stopPropagation(); this._setRefreshDelay(ctf.id, e.target.value); }}
+                  />ms
+                </label>
+                <button title="Delete this CTF" style="background:#b52a37;color:#fff; border:none; border-radius:4px; font-size:1.1em; padding:0.3em 0.7em; cursor:pointer;" @click=${() => this.deleteCtf(ctf.id)}>🗑️</button>
               </li>
             `)}
           </ul>
@@ -395,6 +423,7 @@ export class CtfList extends LitElement {
           <ctf-challenges
             .ctfId=${this.selectedCtf.id}
             .login=${this.selectedCtf.login}
+            .slowRefresh=${this._getRefreshDelay(this.selectedCtf)}
             .open=${true}
             @close-ctf-challenges=${this.handleCloseChallenges.bind(this)}
           ></ctf-challenges>

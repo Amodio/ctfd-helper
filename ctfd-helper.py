@@ -72,7 +72,7 @@ def list_ctfs():
                         'name': data.get('name'),
                         'url': data.get('url'),
                         'login': data.get('login'),
-                        # add other fields if needed
+                        'refresh_delay': data.get('refresh_delay', None),
                     }
                     ctf_list.append(ctf_entry)
                     # Track the last login found (most recent file wins)
@@ -138,6 +138,16 @@ def get_challenges(ctf_id):
         ctf_data['challenges'] = challenges
         if update_ctf_cache(ctf_id, ctf_data) == False:
             return jsonify({'error': 'Failed to update CTF data'}), 500
+    # Annotate challenges with has_pending_flags based on stored untested flags
+    flags = ctf_data.get('flags', [])
+    pending_by_chall = set(
+        str(f['challenge_id']) for f in flags if f.get('state') == 'untested'
+    )
+    for ch in ctf_data.get('challenges', []):
+        if str(ch.get('id')) in pending_by_chall:
+            ch['has_pending_flags'] = True
+        else:
+            ch.pop('has_pending_flags', None)
     return jsonify(ctf_data)
 
 def fetch_challenge(url, login, password, ctf_id, ch_id, ctf_data=None):
@@ -666,6 +676,19 @@ def update_ctf_credentials(ctf_id):
     ctf_data['login'] = login
     ctf_data['password'] = password
     ctf_data['token'] = token
+    if not update_ctf_cache(ctf_id, ctf_data):
+        return jsonify({'error': 'Failed to update CTF data.'}), 500
+    return jsonify({'success': True})
+
+@app.route('/ctf/<int:ctf_id>/settings', methods=['POST'])
+def update_ctf_settings(ctf_id):
+    """Update miscellaneous settings for a CTF (e.g. refresh_delay)."""
+    data = request.get_json()
+    ctf_data = load_ctf_cache(ctf_id)
+    if ctf_data is None:
+        return jsonify({'error': 'CTF not found.'}), 404
+    if 'refresh_delay' in data:
+        ctf_data['refresh_delay'] = int(data['refresh_delay'])
     if not update_ctf_cache(ctf_id, ctf_data):
         return jsonify({'error': 'Failed to update CTF data.'}), 500
     return jsonify({'success': True})
