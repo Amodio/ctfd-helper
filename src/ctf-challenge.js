@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import { marked } from 'marked';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import './ctf-solves-box.js';
 import './ctf-magic-box.js';
@@ -553,7 +554,7 @@ export class CtfChallenge extends LitElement {
             </span>
           ` : ''}
         </div>
-        <div class="desc">${unsafeHTML(this._rewriteDescriptionUrls(ch.description || 'No description.'))}</div>
+        <div class="desc">${unsafeHTML(this._renderDescription(ch.description || 'No description.'))}</div>
         ${ch.connection_info != null ? html`<div style="margin:0.5em 0 0.5em 0; padding:0.5em; background:#181c1f; border-left:4px solid #007bff; color:#e0ffe0; font-family:monospace; white-space:pre-line;">${ch.connection_info}</div>` : ''}
         ${hintsBlock}
         ${fileLinks}
@@ -612,7 +613,14 @@ export class CtfChallenge extends LitElement {
     }
   }
 
-  _rewriteDescriptionUrls(descHtml) {
+  _renderDescription(raw) {
+    // Parse markdown into HTML first, then rewrite URLs
+    let descHtml;
+    try {
+      descHtml = marked.parse(raw);
+    } catch (e) {
+      descHtml = raw;
+    }
     if (this.ctfId == null) return descHtml;
     const id = encodeURIComponent(this.ctfId);
     // Strip the CTFd origin from absolute URLs so the path-based rewrite below catches them
