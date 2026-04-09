@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import './ctf-solves-box.js';
 import './ctf-magic-box.js';
 
@@ -172,6 +173,7 @@ export class CtfChallenge extends LitElement {
     const ctfId = this.ctfId;
     const challenge = this.challenge;
     if (ctfId == null || !challenge || !challenge.id) return;
+    this._forceRefresh = forceRefresh;
     this.loading = true;
     this.error_str = '';
     this.requestUpdate(); // Ensure UI shows loading state immediately
@@ -200,6 +202,7 @@ export class CtfChallenge extends LitElement {
       this.error_str = 'Failed to load challenge info.';
     } finally {
       this.loading = false;
+      this._forceRefresh = false;
       this.requestUpdate();
     }
   }
@@ -550,7 +553,7 @@ export class CtfChallenge extends LitElement {
             </span>
           ` : ''}
         </div>
-        <div class="desc">${ch.description || 'No description.'}</div>
+        <div class="desc">${unsafeHTML(this._rewriteDescriptionUrls(ch.description || 'No description.'))}</div>
         ${ch.connection_info != null ? html`<div style="margin:0.5em 0 0.5em 0; padding:0.5em; background:#181c1f; border-left:4px solid #007bff; color:#e0ffe0; font-family:monospace; white-space:pre-line;">${ch.connection_info}</div>` : ''}
         ${hintsBlock}
         ${fileLinks}
@@ -607,6 +610,21 @@ export class CtfChallenge extends LitElement {
       this.challenge.hints[idx]._loading = false;
       this.requestUpdate();
     }
+  }
+
+  _rewriteDescriptionUrls(descHtml) {
+    if (this.ctfId == null) return descHtml;
+    const id = encodeURIComponent(this.ctfId);
+    // Strip the CTFd origin from absolute URLs so the path-based rewrite below catches them
+    const ctfOrigin = this.ctfUrl ? this.ctfUrl.replace(/\/$/, '') : null;
+    if (ctfOrigin) {
+      const escapedOrigin = ctfOrigin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      descHtml = descHtml.replace(new RegExp(escapedOrigin + '(/[^"\'\\s>]*)', 'g'), '$1');
+    }
+    // Rewrite absolute-path src/href attributes to go through our caching proxy.
+    const re = new RegExp(`((?:src|href)=["'])((?!https?://|/cached_file/|/api/)/[^"']+)(["'])`, 'g');
+    const qs = this._forceRefresh ? '?refresh=1' : '';
+    return descHtml.replace(re, (_, prefix, path, suffix) => `${prefix}/cached_file/${id}${path}${qs}${suffix}`);
   }
 }
 

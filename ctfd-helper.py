@@ -12,6 +12,7 @@ import struct
 
 app = Flask(__name__)
 DATA_DIR = 'data'
+CACHE_DIR = 'cache'
 
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     FRONTEND_DIR = os.path.join(sys._MEIPASS, 'build')
@@ -248,6 +249,63 @@ def serve_frontend():
     return send_from_directory(FRONTEND_DIR, 'index.html')  # Serve index.html
 
 # Add a route for other static files in the frontend directory
+
+import mimetypes
+
+@app.route('/cached_file/<int:ctf_id>/<path:file_path>')
+def cached_file(ctf_id, file_path):
+    """Serve a CTFd file from local cache, fetching and caching it on first access.
+    Pass ?refresh=1 to force re-download from the CTFd server."""
+    force_refresh = request.args.get('refresh') == '1'
+    full_remote_path = '/' + file_path
+    # Strip query string from file_path for the cache key
+    cache_rel = os.path.join(str(ctf_id), file_path.split('?')[0])
+    dest = os.path.join(CACHE_DIR, cache_rel)
+
+    if os.path.exists(dest) and not force_refresh:
+        mime, _ = mimetypes.guess_type(dest)
+        with open(dest, 'rb') as fh:
+            return app.response_class(fh.read(), mimetype=mime or 'application/octet-stream')
+
+    # Need to fetch from CTFd
+    ctf_data = load_ctf_cache(ctf_id)
+    if ctf_data is None:
+        return jsonify({'error': f'CTF #{ctf_id} not found'}), 404
+    url = ctf_data.get('url', '').rstrip('/')
+    token = ctf_data.get('token')
+    login = ctf_data.get('login')
+    password = ctf_data.get('password')
+    if not token:
+        token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
+        if not token:
+            return jsonify({'error': f'Could not fetch session token: {err}'}), 502
+    headers = {'Cookie': f'session={token}'}
+    # Preserve any query string the CTFd URL may carry (e.g. token params)
+    qs = request.query_string.decode()
+    qs = '&'.join(p for p in qs.split('&') if not p.startswith('refresh='))
+    remote_url = url + full_remote_path + (('?' + qs) if qs else '')
+    print(f"[DBG] Fetching file for cache: {remote_url}")
+    try:
+        r = requests.get(remote_url, headers=headers, timeout=60, stream=True)
+        if r.status_code == 401:
+            token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
+            if not token:
+                return jsonify({'error': f'Could not fetch session token: {err}'}), 502
+            headers = {'Cookie': f'session={token}'}
+            r = requests.get(remote_url, headers=headers, timeout=60, stream=True)
+        if not r.ok:
+            return jsonify({'error': f'Failed to fetch file: {r.status_code}'}), 502
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, 'wb') as fh:
+            for chunk in r.iter_content(chunk_size=65536):
+                fh.write(chunk)
+    except Exception as e:
+        return jsonify({'error': f'Error fetching file: {e}'}), 502
+
+    mime, _ = mimetypes.guess_type(dest)
+    with open(dest, 'rb') as fh:
+        return app.response_class(fh.read(), mimetype=mime or 'application/octet-stream')
+
 @app.route('/<path:path>')
 def serve_static(path):
     """Serves static files from the frontend directory."""
@@ -813,6 +871,7 @@ if __name__ == '__main__':
         sys.exit(1)
     # Create DATA_DIR if needed
     os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(CACHE_DIR, exist_ok=True)
     from werkzeug.serving import make_server
     server = make_server('127.0.0.1', 5000, app)
     webbrowser.open('http://127.0.0.1:5000', new=1)

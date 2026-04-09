@@ -1,8 +1,11 @@
 # Frontend directory
 build/
 
-# CTFd saved data
+# CTFd saved data (credentials, challenges list/details with flags)
 data/
+
+# CTFd cached data (images, files)
+cache/
 
 # NodeJS modules
 node_modules/
@@ -10,5 +13,5 @@ node_modules/
 # Windows PE binary
 ctfd-helper.exe
 
-# Not directly used by this project anyways
+# Not directly used by this project
 misc/hackropole_dump.json
