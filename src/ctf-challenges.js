@@ -313,6 +313,7 @@ export class CtfChallenges extends LitElement {
 
   openChallenge(ch) {
     // Always fetch the latest details and flags from backend when opening a challenge
+    document.body.style.overflow = 'hidden';
     this.selectedChallenge = { ...ch };
     this.requestUpdate();
     // Use a microtask to ensure the modal is rendered before fetching
@@ -325,6 +326,7 @@ export class CtfChallenges extends LitElement {
   }
 
   closeChallenge() {
+    document.body.style.overflow = '';
     this.selectedChallenge = null;
     this.requestUpdate();
   }
@@ -557,15 +559,16 @@ export class CtfChallenges extends LitElement {
         </div>
         ${Object.keys(grouped).length === 0 ? html`<p>No challenges yet, please wait a few seconds...</p>` : ''}
         ${this.selectedChallenge ? html`
-          <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0008;z-index:1000;display:flex;align-items:center;justify-content:center;"
+          <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0008;z-index:1000;display:flex;align-items:center;justify-content:center;overflow:hidden;"
             @mousedown=${e => { this._overlayMousedownTarget = e.target; }}
             @click=${e => { if (e.target === e.currentTarget && this._overlayMousedownTarget === e.currentTarget) this.closeChallenge(); }}
-            @refresh-challenges=${() => { this.selectedChallenge = null; this.loadChallenges(true); this.requestUpdate(); }}>
+            @refresh-challenges=${() => { document.body.style.overflow = ''; this.selectedChallenge = null; this.loadChallenges(true); this.requestUpdate(); }}>
             <ctf-challenge
               .ctfId=${this.ctfId}
               .ctfUrl=${this.ctfUrl}
               .challenge=${this.selectedChallenge}
               .open=${true}
+              style="max-height:90vh;overflow-y:auto;"
               @close-ctf-challenge=${this.closeChallenge.bind(this)}
             ></ctf-challenge>
           </div>
