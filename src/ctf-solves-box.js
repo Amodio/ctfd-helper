@@ -146,7 +146,7 @@ export class CtfSolvesBox extends LitElement {
           ${this.solves.map(solve => html`
             <li>
               <span class="solve-user">
-                <a href="/?username=${solve.name}&user_id=${solve.account_id}" target="_blank" style="color:#00eaff;text-decoration:underline;">
+                <a .href=${'/?username=' + encodeURIComponent(solve.name ?? '') + '&user_id=' + encodeURIComponent(solve.account_id ?? '')} target="_blank" style="color:#00eaff;text-decoration:underline;">
                   ${solve.name}
                 </a>
               </span>

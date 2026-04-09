@@ -1,5 +1,4 @@
 import { LitElement, html, css } from 'lit';
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 
 import './ctf-challenge.js';
 
@@ -434,7 +433,7 @@ export class CtfChallenges extends LitElement {
           >${this.hideSolved ? '🙈' : '🐵'}</span>
         </div>
         <h2 style="margin-bottom:0.5em; display: flex; align-items: center; justify-content: center; gap: 0.7em; flex-wrap: wrap; text-align: center;">
-          ${displayName ? html`<span class="ctf-login">${unsafeHTML(displayName)}</span>` : ''}
+          ${displayName ? html`<span class="ctf-login">${displayName}</span>` : ''}
           <span style="font-size:0.9em; color:#555;">
             ${solved}/${total} solved (${total > 0 ? Math.round((solved/total)*100) : 0}%)
             ${(() => {
