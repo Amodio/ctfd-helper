@@ -333,7 +333,7 @@ export class CtfList extends LitElement {
   _getRefreshDelay(ctf) {
     // Use server-stored value if present, otherwise default based on name
     if (ctf.refresh_delay !== null && ctf.refresh_delay !== undefined) return Number(ctf.refresh_delay);
-    return /fcsc/i.test(ctf.name || '') ? 1000 : 0;
+    return /fcsc/i.test(ctf.name || '') ? 1337 : 200;
   }
 
   async _setRefreshDelay(ctfId, value) {
@@ -404,7 +404,7 @@ export class CtfList extends LitElement {
               <li style="width: 100%; max-width: 500px; display: flex; justify-content: center; align-items: center; gap: 0.4em;">
                 <button @click=${() => this.showChallenges(ctf)}><span class="ctf-list-name">${ctf.name}</span></button>
                 <button style="background:#ffc107;color:#222;" @click=${() => this.editCredentials(ctf)}>Edit Credentials</button>
-                <label title="Delay between requests during refresh (ms). Set to 0 to disable. Defaults to 1000ms for FCSC CTFs." style="display:flex;align-items:center;gap:0.3em;color:#aaa;font-size:0.9em;white-space:nowrap;user-select:none;">
+                <label title="Delay between requests during refresh (ms). Set to 0 to disable. Defaults to 200ms or 1337ms for FCSC CTFs." style="display:flex;align-items:center;gap:0.3em;color:#aaa;font-size:0.9em;white-space:nowrap;user-select:none;">
                   🐢<input type="number" min="0" max="10000" step="100"
                     style="width:5em;background:#181c1b;color:#e0ffe0;border:1px solid #444;border-radius:4px;padding:0.15em 0.3em;font-family:monospace;font-size:0.95em;"
                     .value=${String(this._getRefreshDelay(ctf))}
