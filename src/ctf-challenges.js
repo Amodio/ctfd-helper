@@ -16,11 +16,8 @@ export class CtfChallenges extends LitElement {
 
   static styles = [
     css`
-      .refresh-btn:hover {
-        background: #0056b3;
-      }
       button[title="List of CTF"]:hover, button.refresh-btn:hover {
-        background: rgb(26, 58, 26) !important;
+        background: #0056b3 !important;
         color: #fff !important;
       }
       .ctf-login {
@@ -407,13 +404,13 @@ export class CtfChallenges extends LitElement {
       <div style="padding:1em; background:#0008; min-width: 350px; position:relative;">
         <div style="display:flex;align-items:center;gap:0.7em;position:relative;justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:0.7em;flex:1 1 0;">
-            <button title="List of CTF" @click=${() => this.close()} style="font-size:1.6em; background:transparent; border:1px #222; border-radius: 4px; cursor: pointer;">
+            <button title="List of CTF" @click=${() => this.close()} style="font-size:1.6em; background:transparent; border:1px #222; border-radius: 4px; cursor: pointer; padding: 0.1em;">
               🔙
             </button>
             <button
               title="${this.isLoading ? 'Stop refresh' : 'Refresh all challenges'}"
               class="refresh-btn${this.isLoading ? ' spinning' : ''}"
-              style="font-size:1.6em; border: none; border-radius: 4px; background: rgb(16, 22, 21); background: transparent; cursor: pointer;"
+              style="font-size:1.6em; border: none; border-radius: 4px; background: rgb(16, 22, 21); background: transparent; cursor: pointer; padding: 0.1em;"
               @click=${() => { if (this.isLoading && this._abortController) { this._abortController.abort(); this.isLoading = false; this.requestUpdate(); } else { this.loadChallenges(true); } }}
             >🔄</button>
           </div>
@@ -426,11 +423,11 @@ export class CtfChallenges extends LitElement {
               // Force update of the title attribute after state change
               setTimeout(() => {
                 const el = this.shadowRoot && this.shadowRoot.querySelector('.hide-solved-toggle');
-                if (el) el.title = this.hideSolved ? 'Show all' : 'Hide solved';
+                if (el) el.title = this.hideSolved ? 'Show all challenges' : 'Hide solved challenges';
               }, 0);
             }}
             class="hide-solved-toggle"
-            title="${this.hideSolved ? 'Show all' : 'Hide solved'}"
+            title="${this.hideSolved ? 'Show all challenges' : 'Hide solved challenges'}"
             style="font-size:1.6em;cursor:pointer;user-select:none;"
           >${this.hideSolved ? '🙈' : '🐵'}</span>
         </div>

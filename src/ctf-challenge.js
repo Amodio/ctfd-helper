@@ -55,7 +55,7 @@ export class CtfChallenge extends LitElement {
       border: none;
       border-radius: 4px;
       background: rgb(16, 22, 21);
-      padding: 0em 0em;
+      padding: 0.1em;
       cursor: pointer;
     }
     .refresh-btn:hover {
