@@ -559,7 +559,8 @@ export class CtfChallenges extends LitElement {
         ${Object.keys(grouped).length === 0 ? html`<p>No challenges yet, please wait a few seconds...</p>` : ''}
         ${this.selectedChallenge ? html`
           <div style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#0008;z-index:1000;display:flex;align-items:center;justify-content:center;"
-            @click=${e => { if (e.target === e.currentTarget) this.closeChallenge(); }}
+            @mousedown=${e => { this._overlayMousedownTarget = e.target; }}
+            @click=${e => { if (e.target === e.currentTarget && this._overlayMousedownTarget === e.currentTarget) this.closeChallenge(); }}
             @refresh-challenges=${() => { this.selectedChallenge = null; this.loadChallenges(true); this.requestUpdate(); }}>
             <ctf-challenge
               .ctfId=${this.ctfId}
