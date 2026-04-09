@@ -538,8 +538,8 @@ export class CtfChallenges extends LitElement {
                       </td>
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333; color:#aaa; text-align:center;">
                         ${isLocked
-                          ? html`<del>${ch.tags && ch.tags.length ? ch.tags.map(t => html`<span class="ctf-tag" data-tag="${(t.value || t).toLowerCase()}">${t.value || t}</span>`) : ''}</del>`
-                          : (ch.tags && ch.tags.length ? ch.tags.map(t => html`<span class="ctf-tag" data-tag="${(t.value || t).toLowerCase()}">${t.value || t}</span>`) : '')}
+                          ? html`<del>${ch.tags && ch.tags.length ? ch.tags.map(t => html`<span class="ctf-tag" data-tag="${(t.value || t).toLowerCase()}" style="margin-right:0.3em;">${t.value || t}</span>`) : ''}</del>`
+                          : (ch.tags && ch.tags.length ? ch.tags.map(t => html`<span class="ctf-tag" data-tag="${(t.value || t).toLowerCase()}" style="margin-right:0.3em;">${t.value || t}</span>`) : '')}
                       </td>
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333; color:#ffd700; text-align:center;">
                         ${isLocked ? html`<del>${ch.value || ''}</del>` : (ch.value || '')}
