@@ -429,7 +429,7 @@ export class CtfChallenge extends LitElement {
           <ul style="margin:0.2em 0 0 1.2em; padding:0; list-style:none;">
             ${ch.files.map(f => {
               let filename = f.split('/').pop().split('?')[0];
-              let url = ctfUrl + f;
+              let url = /^https?:\/\//.test(f) ? f : ctfUrl + f;
               return html`<li style="display:inline-block;margin-right:0.5em;margin-bottom:0.3em;">
                 <a href="${url}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:0.4em;padding:0.35em 0.9em 0.35em 0.7em;background:#222;border:1px solid #17a2b8;border-radius:0.5em;color:#00eaff;text-decoration:none;font-family:monospace;font-size:1em;transition:background 0.18s,box-shadow 0.18s;box-shadow:0 1px 4px #0002;cursor:pointer;">
                   <span style="font-size:1.1em;">💾</span>
