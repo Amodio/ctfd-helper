@@ -20,13 +20,13 @@ export class CtfChallenges extends LitElement {
       .refresh-btn:hover {
         background: #0056b3;
       }
-      button[title="List of CTF"]:hover {
-        background: #6c2ebf !important;
+      button[title="List of CTF"]:hover, button.refresh-btn:hover {
+        background: rgb(26, 58, 26) !important;
         color: #fff !important;
       }
       .ctf-login {
         display: inline-block;
-        font-size: 1.6em;
+        font-size: 1.3em;
         font-weight: 900;
         background: linear-gradient(90deg, #6a8caf 0%, #b0c4de 40%, #a7c7bd 70%, #7a9e9f 100%);
         -webkit-background-clip: text;
@@ -39,9 +39,7 @@ export class CtfChallenges extends LitElement {
         margin: 0.1em 0.2em;
         /* No border, no box-shadow, no animation */
         border: none;
-        box-shadow: none;
-        animation: none;
-        transition: none;
+        box-shadow: none
         text-shadow: none;
       }
       .ctf-ch-row.updating {
@@ -408,18 +406,18 @@ export class CtfChallenges extends LitElement {
       <div style="padding:1em; background:#0008; min-width: 350px; position:relative;">
         <div style="display:flex;align-items:center;gap:0.7em;position:relative;justify-content:space-between;">
           <div style="display:flex;align-items:center;gap:0.7em;flex:1 1 0;">
-            <button title="List of CTF" @click=${() => this.close()} style="font-size:1.3em; background:#26044d; color:#fff; border:1px solid #222; cursor: pointer;">
+            <button title="List of CTF" @click=${() => this.close()} style="font-size:1.6em; background:transparent; border:1px #222; border-radius: 4px; cursor: pointer;">
               🔙
             </button>
             <button
               title="${this.isLoading ? 'Stop refresh' : 'Refresh all challenges'}"
               class="refresh-btn${this.isLoading ? ' spinning' : ''}"
-              style="font-size:1.6em; border: none; border-radius: 4px; background: rgb(16, 22, 21); padding: 0em 0em; cursor: pointer;"
+              style="font-size:1.6em; border: none; border-radius: 4px; background: rgb(16, 22, 21); background: transparent; cursor: pointer;"
               @click=${() => { if (this.isLoading && this._abortController) { this._abortController.abort(); this.isLoading = false; this.requestUpdate(); } else { this.loadChallenges(true); } }}
             >🔄</button>
           </div>
           <div style="flex:2 1 0; display:flex; justify-content:center; align-items:center;">
-            ${ctfName ? html`<span style="font-size:2.4em;font-weight:900;background: linear-gradient(90deg, #00ffe7 0%, #00aaff 30%, #7d3cff 65%, #ff3c6f 100%);-webkit-background-clip: text;-webkit-text-fill-color: transparent;background-clip: text;text-fill-color: transparent;text-shadow: 0 1px 8px #00ffe755, 0 1px 0 #222, 0 0 2px #ff3c6f99;letter-spacing: 0.02em;border-radius: 0.2em;padding: 0.03em 0.15em;display: inline-block; text-align:center;">${ctfName}</span>` : ''}
+            ${ctfName ? html`<span style="font-size:3.0em;font-weight:900;background: linear-gradient(90deg, #00ffe7 0%, #00aaff 30%, #7d3cff 65%, #ff3c6f 100%);-webkit-background-clip: text;-webkit-text-fill-color: transparent;background-clip: text;text-fill-color: transparent;text-shadow: 0 1px 8px #00ffe755, 0 1px 0 #222, 0 0 2px #ff3c6f99;letter-spacing: 0.02em;border-radius: 0.2em;padding: 0.03em 0.15em;display: inline-block; text-align:center;">${ctfName}</span>` : ''}
           </div>
           <span
             @click=${() => {
