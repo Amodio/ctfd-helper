@@ -56,16 +56,16 @@ session = CountingSession()
 def fetch_urls() -> list[tuple[str, str]]:
     """Extracts the challenges list URI from Hackropole."""
     # Despite the prefix, URI is the same for both languages (en&fr)
-    # response = session.get(BASE_URL + "/en/index.json")
-    # response.raise_for_status()     # Raise error if request failed
-    # data = response.json()
-    data = json.loads(r'''[
-    {
-        "uri": "https://hackropole.fr/en/challenges/reverse/fcsc2019-reverse-ybab/"
-    },
-    {
-        "uri": "https://hackropole.fr/en/challenges/hardware/fcsc2024-hardware-unknown-public-key/"
-    }]''')
+    response = session.get(BASE_URL + "/en/index.json")
+    response.raise_for_status()     # Raise error if request failed
+    data = response.json()
+    # data = json.loads(r'''[
+    # {
+    #     "uri": "https://hackropole.fr/en/challenges/reverse/fcsc2019-reverse-ybab/"
+    # },
+    # {
+    #     "uri": "https://hackropole.fr/en/challenges/hardware/fcsc2024-hardware-unknown-public-key/"
+    # }]''')
     prefix = BASE_URL + '/en/challenges/'
     return [
         tuple(cleaned.split('/', 1))    # returns: [(category, challenge_url)*]
