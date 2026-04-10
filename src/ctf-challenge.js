@@ -556,12 +556,14 @@ export class CtfChallenge extends LitElement {
 }}>Solves: <b>${ch.solves}</b></span>` : ''}
           ${typeof ch.max_attempts === 'number' && ch.max_attempts > 0 ? html`
             <span style="margin-left:1em; color:#b52a37;">
-              Attempts: <b>${ch.attempts || 0}/${ch.max_attempts}</b>
+              ${this.viewOnly
+                ? html`Max attempts: <b>${ch.max_attempts}</b>`
+                : html`Attempts: <b>${ch.attempts || 0}/${ch.max_attempts}</b>`}
             </span>
           ` : ''}
         </div>
         <div class="desc">${unsafeHTML(this._renderDescription(ch.description || 'No description.'))}</div>
-        ${ch.connection_info != null ? html`<div style="margin:0.5em 0 0.5em 0; padding:0.5em; background:#181c1f; border-left:4px solid #007bff; color:#e0ffe0; font-family:monospace; line-height: 1.3em;">${ch.connection_info}</div>` : ''}
+        ${ch.connection_info != null ? html`<div style="margin:0.5em 0 0.5em 0; padding:0.5em; background:#181c1f; border-left:4px solid #007bff; color:#e0ffe0; font-family:monospace; white-space:pre-line;">${ch.connection_info}</div>` : ''}
         ${hintsBlock}
         ${fileLinks}
         ${flagList}
