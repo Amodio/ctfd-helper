@@ -133,13 +133,22 @@ def get_challenges(ctf_id):
         if challenges is None or err_msg:
             return jsonify({'error': err_msg}), 404
         old_solved = {str(ch.get('id')) for ch in (ctf_data.get('challenges') or []) if ch.get('solved_by_me')}
+        # Preserve attempts/max_attempts from cached challenge details
+        detail_by_id = {str(ch.get('id')): ch for ch in (ctf_data.get('challenge') or [])}
         for ch in challenges:
             if str(ch.get('id')) in old_solved:
                 ch['solved_by_me'] = True
+            det = detail_by_id.get(str(ch.get('id')))
+            if det:
+                if 'attempts' in det:
+                    ch['attempts'] = det['attempts']
+                if 'max_attempts' in det:
+                    ch['max_attempts'] = det['max_attempts']
         ctf_data['challenges'] = challenges
         if update_ctf_cache(ctf_id, ctf_data) == False:
             return jsonify({'error': 'Failed to update CTF data'}), 500
-    # Annotate challenges with has_pending_flags based on stored untested flags
+    # Annotate challenges at response time from stored detail cache
+    detail_by_id = {str(ch.get('id')): ch for ch in (ctf_data.get('challenge') or [])}
     flags = ctf_data.get('flags', [])
     pending_by_chall = set(
         str(f['challenge_id']) for f in flags if f.get('state') == 'untested'
@@ -149,6 +158,12 @@ def get_challenges(ctf_id):
             ch['has_pending_flags'] = True
         else:
             ch.pop('has_pending_flags', None)
+        det = detail_by_id.get(str(ch.get('id')))
+        if det:
+            if 'attempts' in det:
+                ch['attempts'] = det['attempts']
+            if 'max_attempts' in det:
+                ch['max_attempts'] = det['max_attempts']
     return jsonify(ctf_data)
 
 def fetch_challenge(url, login, password, ctf_id, ch_id, ctf_data=None):

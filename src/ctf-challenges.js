@@ -431,7 +431,7 @@ export class CtfChallenges extends LitElement {
             }}
             class="hide-solved-toggle"
             title="${this.hideSolved ? 'Show all challenges' : 'Hide solved challenges'}"
-            style="font-size:1.6em;cursor:pointer;user-select:none;"
+            style="font-size:2em;cursor:pointer;user-select:none;"
           >${this.hideSolved ? '🙈' : '🐵'}</span>
         </div>
         <h2 style="margin-bottom:0.5em; display: flex; align-items: center; justify-content: center; gap: 0.7em; flex-wrap: wrap; text-align: center;">
