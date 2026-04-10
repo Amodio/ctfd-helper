@@ -112,7 +112,58 @@ export class CtfList extends LitElement {
     #add-ctf-btn:hover {
       background: #117a8b;
     }
+    .ctf-list-ul {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0;
+    }
+    .ctf-list-item {
+      width: 100%;
+      max-width: 500px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.4em;
+    }
+    .edit-credentials-btn {
+      background: #ffc107;
+      color: #222;
+    }
+    .delete-ctf-btn {
+      background: #b52a37;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 1.1em;
+      padding: 0.3em 0.7em;
+      cursor: pointer;
+    }
+    .refresh-delay-label {
+      display: flex;
+      align-items: center;
+      gap: 0.3em;
+      color: #aaa;
+      font-size: 0.9em;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .refresh-delay-input {
+      width: 5em;
+      background: #181c1b;
+      color: #e0ffe0;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 0.15em 0.3em;
+      font-family: monospace;
+      font-size: 0.95em;
+    }
+    .add-btn-wrapper {
+      display: flex;
+      justify-content: center;
+    }
   `;
+
   constructor() {
     super();
     this.ctfs = [];
@@ -399,23 +450,30 @@ export class CtfList extends LitElement {
           </form>
         ` : ''}
         ${showList && !this.showForm ? html`
-          <ul style="display: flex; flex-direction: column; align-items: center; padding: 0;">
+          <ul class="ctf-list-ul">
             ${this.ctfs.map(ctf => html`
-              <li style="width: 100%; max-width: 500px; display: flex; justify-content: center; align-items: center; gap: 0.4em;">
+              <li class="ctf-list-item">
                 <button @click=${() => this.showChallenges(ctf)}><span class="ctf-list-name">${ctf.name}</span></button>
-                <button style="background:#ffc107;color:#222;" @click=${() => this.editCredentials(ctf)}>Edit Credentials</button>
-                <label title="Delay between requests during refresh (ms). Set to 0 to disable. Defaults to 200ms (1337ms for FCSC)." style="display:flex;align-items:center;gap:0.3em;color:#aaa;font-size:0.9em;white-space:nowrap;user-select:none;">
-                  🐢<input type="number" min="0" max="10000" step="100"
-                    style="width:5em;background:#181c1b;color:#e0ffe0;border:1px solid #444;border-radius:4px;padding:0.15em 0.3em;font-family:monospace;font-size:0.95em;"
+                <button class="edit-credentials-btn" @click=${() => this.editCredentials(ctf)}>Edit Credentials</button>
+                <label
+                  class="refresh-delay-label"
+                  title="Delay between requests during refresh (ms). Set to 0 to disable. Defaults to 200ms (1337ms for FCSC)."
+                >
+                  🐢<input
+                    type="number"
+                    min="0"
+                    max="10000"
+                    step="100"
+                    class="refresh-delay-input"
                     .value=${String(this._getRefreshDelay(ctf))}
                     @change=${e => { e.stopPropagation(); this._setRefreshDelay(ctf.id, e.target.value); }}
                   />ms
                 </label>
-                <button title="Delete this CTF" style="background:#b52a37;color:#fff; border:none; border-radius:4px; font-size:1.1em; padding:0.3em 0.7em; cursor:pointer;" @click=${() => this.deleteCtf(ctf.id)}>🗑️</button>
+                <button title="Delete this CTF" class="delete-ctf-btn" @click=${() => this.deleteCtf(ctf.id)}>🗑️</button>
               </li>
             `)}
           </ul>
-          <div style="display: flex; justify-content: center;">
+          <div class="add-btn-wrapper">
             <button id="add-ctf-btn" @click=${() => this.showAddCtfForm()}>New CTF</button>
           </div>
         ` : ''}
