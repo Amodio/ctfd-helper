@@ -3,7 +3,7 @@ FROM alpine
 
 WORKDIR "/python3"
 # python3
-RUN apk add --no-cache-dir wine-mono py3-pip                    \
+RUN apk add --no-cache wine-mono py3-pip                        \
     -X http://dl-cdn.alpinelinux.org/alpine/edge/testing     && \
     wget -O python.zip                                          \
     https://www.python.org/ftp/python/3.13.5/python-3.13.5-embed-amd64.zip && \
@@ -24,7 +24,7 @@ COPY --chmod=0755 <<__EOF__ /root/entrypoint.sh
 wine /python3/Scripts/pyinstaller.exe --distpath /mnt/  \\
     --add-data="/mnt/build/index.html:build"            \\
     --add-data="/mnt/build/main.js:build"               \\
-    --onefile /mnt/ctfd-helper.py
+    --onefile /mnt/ctfd-helper.py --exclude-module _ios_support
 rm -rf build/ ctfd-helper.spec
 __EOF__
 
