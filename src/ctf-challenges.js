@@ -515,7 +515,7 @@ export class CtfChallenges extends LitElement {
                       <td style="padding:0.1em 0.05em; border-bottom:1px solid #333;">
                         ${ch.solved_by_me === true
                           ? html`<span style='color:#7fff7f; font-size:1.5em; margin-left:0.2em;'>✔</span>`
-                          : ch.has_pending_flags
+                          : (ch.has_pending_flags && !this.hasUserName)
                             ? html`<span style='font-size:1.5em; margin-left:0.2em;' title="You have a flag to submit">❔</span>`
                             : html`<span style='color:#ff7f7f; font-size:1.5em; margin-left:0.2em;'>✗</span>`}
                       </td>

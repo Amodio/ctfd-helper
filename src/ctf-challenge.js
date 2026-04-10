@@ -189,7 +189,10 @@ export class CtfChallenge extends LitElement {
       const prevSolvedByMe = challenge.solved_by_me;
       this.challenge = data.challenge;
       // In view-as mode, solved_by_me comes from the user's solve list, not the backend detail
-      if (this.viewOnly) this.challenge.solved_by_me = prevSolvedByMe;
+      if (this.viewOnly) {
+        this.challenge.solved_by_me = prevSolvedByMe;
+        this.flags = []; // hide our own flags in view-as mode
+      }
       // Ensure all flags have a .value property for frontend display
       this.flags = Array.isArray(data.flags) ? data.flags.map(f => ({
         ...f,
