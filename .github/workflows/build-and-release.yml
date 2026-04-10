@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '24'
           cache: 'npm'  # Cache npm dependencies for faster builds
@@ -29,6 +29,12 @@ jobs:
 
       - name: Build project
         run: npm run build
+
+      - name: Build Windows executable
+        run: |
+          docker build -t ctfd-helper/windows_builder windows_builder/
+          docker run --rm -v "${{ github.workspace }}:/mnt" \
+          --name windows_builder ctfd-helper/windows_builder
 
       - name: Prepare release
         run: |
@@ -40,12 +46,6 @@ jobs:
         run: |
           zip -r ctfd-helper.zip ctfd-helper/
           rm -rf ctfd-helper/
-
-      - name: Build Windows executable
-        run: |
-          docker build -t ctfd-helper/windows_builder windows_builder/
-          docker run --rm -v "${{ github.workspace }}:/mnt" \
-          --name windows_builder ctfd-helper/windows_builder
 
       - name: Create GitHub release
         run: |
