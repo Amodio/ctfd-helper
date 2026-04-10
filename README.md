@@ -1,18 +1,22 @@
 # ctfd-helper
-Alternative web client interface for Capture The Flags events. It stores locally the challenges, flags submitted, etc.
+Alternative web client interface for Capture The Flags events. It stores locally the challenges, flags, etc.
 
 ## Installation
+### Preparation
 ```bash
 # Minimal requirement: Python3 with Flask
 apt install python3-pip
 pip install Flask requests --break-system-packages # (or use python -m venv ctfd-helper)
+```
 
+### Finalization
+```bash
 wget https://github.com/Amodio/ctfd-helper/releases/latest/download/ctfd-helper.zip && \
 unzip ctfd-helper.zip && cd ctfd-helper/
 ./ctfd-helper.py
 ```
 
-For Windows, you can also directly use only the bundled package (a bit slower): [ctfd-helper.exe](https://github.com/Amodio/ctfd-helper/releases/latest/download/ctfd-helper.exe).
+Note: on Windows, you can also just directly use the bundled package (a bit slower): [ctfd-helper.exe](https://github.com/Amodio/ctfd-helper/releases/latest/download/ctfd-helper.exe).
 
 ## Installation for developpers
 ```bash
