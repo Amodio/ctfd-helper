@@ -18,6 +18,7 @@ export class CtfChallenge extends LitElement {
     _solvesBoxCtfId: { type: Number },
     flags: { type: Array },
     showMagic: { type: Boolean },
+    viewOnly: { type: Boolean },
   };
 
   static styles = css`
@@ -68,7 +69,6 @@ export class CtfChallenge extends LitElement {
     }
     .desc {
       margin: 1em 0;
-      white-space: pre-line;
     }
     .tags {
       color: #aaa;
@@ -167,6 +167,7 @@ export class CtfChallenge extends LitElement {
     this.flags = [];
     this._justSolved = false; // Track if a valid flag was just submitted
     this.showMagic = false;
+    this.viewOnly = false;
   }
 
   async fetchChallenge(forceRefresh = false) {
@@ -185,7 +186,10 @@ export class CtfChallenge extends LitElement {
       if (!resp.ok) throw new Error('Failed to fetch challenge info');
       const data = await resp.json();
       // data: { challenge: {...}, flags: [...], hints: [...] }
+      const prevSolvedByMe = challenge.solved_by_me;
       this.challenge = data.challenge;
+      // In view-as mode, solved_by_me comes from the user's solve list, not the backend detail
+      if (this.viewOnly) this.challenge.solved_by_me = prevSolvedByMe;
       // Ensure all flags have a .value property for frontend display
       this.flags = Array.isArray(data.flags) ? data.flags.map(f => ({
         ...f,
@@ -441,11 +445,13 @@ export class CtfChallenge extends LitElement {
         </div>
       `;
     }
-    // Render flag list always
-    let flagList = '';
-    let flagInput = '';
     // Determine if challenge is locked (max_attempts reached and not solved)
     const isLocked = typeof ch.max_attempts === 'number' && ch.max_attempts > 0 && typeof ch.attempts === 'number' && ch.attempts >= ch.max_attempts && ch.solved_by_me !== true;
+    const hasValidFlag = Array.isArray(this.flags) && this.flags.some(f => f.state === 'valid');
+    // Render flag list and input (hidden in viewOnly/see-as mode)
+    let flagList = '';
+    let flagInput = '';
+    if (!this.viewOnly) {
     // Always show list of flags (if any)
     if (Array.isArray(this.flags) && this.flags.length > 0) {
       flagList = html`
@@ -479,7 +485,6 @@ export class CtfChallenge extends LitElement {
       `;
     }
     // Only show input form if NOT solved and NOT locked and no valid flag present
-    const hasValidFlag = Array.isArray(this.flags) && this.flags.some(f => f.state === 'valid');
     if (ch.solved_by_me === true || hasValidFlag) {
       flagInput = '';
     } else if (!isLocked) {
@@ -495,6 +500,7 @@ export class CtfChallenge extends LitElement {
     } else {
       flagInput = '';
     }
+    } // end !viewOnly
     // Render hints if present
     let hintsBlock = '';
     if (Array.isArray(ch.hints) && ch.hints.length > 0) {

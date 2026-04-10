@@ -568,6 +568,7 @@ export class CtfChallenges extends LitElement {
               .ctfUrl=${this.ctfUrl}
               .challenge=${this.selectedChallenge}
               .open=${true}
+              .viewOnly=${!!this.hasUserName}
               style="max-height:90vh;overflow-y:auto;"
               @close-ctf-challenge=${this.closeChallenge.bind(this)}
             ></ctf-challenge>
