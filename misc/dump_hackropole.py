@@ -56,16 +56,16 @@ session = CountingSession()
 def fetch_urls() -> list[tuple[str, str]]:
     """Extracts the challenges list URI from Hackropole."""
     # Despite the prefix, URI is the same for both languages (en&fr)
-    response = session.get(BASE_URL + "/en/index.json")
-    response.raise_for_status()     # Raise error if request failed
-    data = response.json()
-    # data = json.loads(r'''[
-    # {
-    #     "uri": "https://hackropole.fr/en/challenges/reverse/fcsc2019-reverse-ybab/"
-    # },
-    # {
-    #     "uri": "https://hackropole.fr/en/challenges/hardware/fcsc2023-hardware-dystylosaurus/"
-    # }]''')
+    # response = session.get(BASE_URL + "/en/index.json")
+    # response.raise_for_status()     # Raise error if request failed
+    # data = response.json()
+    data = json.loads(r'''[
+    {
+        "uri": "https://hackropole.fr/en/challenges/reverse/fcsc2019-reverse-ybab/"
+    },
+    {
+        "uri": "https://hackropole.fr/en/challenges/hardware/fcsc2024-hardware-unknown-public-key/"
+    }]''')
     prefix = BASE_URL + '/en/challenges/'
     return [
         tuple(cleaned.split('/', 1))    # returns: [(category, challenge_url)*]
@@ -153,14 +153,13 @@ def _fetch_challenge_details(category: str, challenge_uri: str, lang: str) -> di
         if li.find('a')
     ]
 
-    # Author
-    author = None
-    for h2 in soup.find_all('h2'):
-        if 'author' in h2.get_text(strip=True).lower():
-            div = h2.find_next('div', class_='font-monospace')
-            if div:
-                author = div.get_text(strip=True)
-            break
+    # Authors
+    authors = next(
+        ([d.get_text(strip=True) for d in h2.find_next('div', class_='row').find_all('div', class_='font-monospace')]
+         for h2 in soup.find_all('h2')
+         if 'author' in h2.get_text(strip=True).lower()),
+        []
+    )
 
     # Instructions
     instructions_raw = _extract_section_text(soup, 'Instructions')
@@ -197,7 +196,7 @@ def _fetch_challenge_details(category: str, challenge_uri: str, lang: str) -> di
         'description': description,
         'instructions': instructions,
         'files': files,
-        'author': author,
+        'authors': authors,
         'flag_infos': flag_infos,
         'solutions': solutions
     }
@@ -268,7 +267,7 @@ def process_challenge(category: str, challenge_uri: str, languages: list[str],
                    f'instructions_{lang}': lang_details.pop('instructions'),
                    **details}
         # Rest of shared fields "read once" (from first language fetched)
-        for key in ('year', 'category', 'difficulty', 'tags', 'title', 'files', 'flag_infos', 'author', 'solutions'):
+        for key in ('year', 'category', 'difficulty', 'tags', 'title', 'files', 'flag_infos', 'authors', 'solutions'):
             if key not in details:
                 details[key] = lang_details.get(key)
 
