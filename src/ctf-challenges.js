@@ -227,9 +227,12 @@ export class CtfChallenges extends LitElement {
               const details = await resp.json();
               
               this.challengeDetails[ch.id] = details.challenge;
-              if (!this.hasUserName && typeof this.challengeDetails[ch.id].solved_by_me !== 'undefined') {
-                ch.solved_by_me = this.challengeDetails[ch.id].solved_by_me;
+              const det = this.challengeDetails[ch.id];
+              if (!this.hasUserName && typeof det.solved_by_me !== 'undefined') {
+                ch.solved_by_me = det.solved_by_me;
               }
+              if (typeof det.attempts === 'number') ch.attempts = det.attempts;
+              if (typeof det.max_attempts === 'number') ch.max_attempts = det.max_attempts;
               reapplyTransientState(fetchOrder);
               this.ctfData.challenges = [...fetchOrder];
               this.requestUpdate();
