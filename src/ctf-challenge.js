@@ -555,7 +555,7 @@ export class CtfChallenge extends LitElement {
           ` : ''}
         </div>
         <div class="desc">${unsafeHTML(this._renderDescription(ch.description || 'No description.'))}</div>
-        ${ch.connection_info != null ? html`<div style="margin:0.5em 0 0.5em 0; padding:0.5em; background:#181c1f; border-left:4px solid #007bff; color:#e0ffe0; font-family:monospace; white-space:pre-line;">${ch.connection_info}</div>` : ''}
+        ${ch.connection_info != null ? html`<div style="margin:0.5em 0 0.5em 0; padding:0.5em; background:#181c1f; border-left:4px solid #007bff; color:#e0ffe0; font-family:monospace; line-height: 1.3em;">${ch.connection_info}</div>` : ''}
         ${hintsBlock}
         ${fileLinks}
         ${flagList}
