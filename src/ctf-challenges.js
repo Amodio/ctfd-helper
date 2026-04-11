@@ -512,6 +512,7 @@ export class CtfChallenges extends LitElement {
       if (ch.solved_by_me === true) solved++;
     }
     const tagOrder = ['intro', 'easy', 'medium', 'hard', 'insane'];
+    const knownTags = new Set(tagOrder);
     function tagRank(tags) {
       if (!tags || !tags.length) return 999;
       const tagVals = tags.map(t => (t.value || t).toLowerCase());
@@ -519,6 +520,19 @@ export class CtfChallenges extends LitElement {
         if (tagVals.includes(tag)) return tagOrder.indexOf(tag);
       }
       return 999;
+    }
+    // Generate a stable hue from a string using a simple hash
+    function tagHue(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) {
+        hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+      }
+      return hash % 360;
+    }
+    function tagStyle(tagVal) {
+      if (knownTags.has(tagVal)) return '';
+      const hue = tagHue(tagVal);
+      return `background:hsl(${hue},55%,28%);color:hsl(${hue},80%,85%);`;
     }
     for (const cat in grouped) {
       grouped[cat].sort((a, b) => tagRank(a.tags) - tagRank(b.tags));
@@ -646,7 +660,11 @@ export class CtfChallenges extends LitElement {
                       ? html`<del>${nameWithAttempts}</del>`
                       : nameWithAttempts;
                     const tagsCell = ch.tags && ch.tags.length
-                      ? ch.tags.map(t => html`<span class="ctf-tag" data-tag="${(t.value || t).toLowerCase()}">${t.value || t}</span>`)
+                      ? ch.tags.map(t => {
+                          const tv = (t.value || t).toLowerCase();
+                          const style = tagStyle(tv);
+                          return html`<span class="ctf-tag" data-tag="${tv}" style="${style}">${t.value || t}</span>`;
+                        })
                       : '';
                     return html`
                       <tr class="ctf-ch-row ${ch.solved_by_me ? 'solved' : 'unsolved'}${this.updatingChallengeId === ch.id ? ' updating' : ''}"

@@ -620,16 +620,26 @@ export class CtfChallenge extends LitElement {
     if (Array.isArray(ch.hints)) {
       ch.hints = ch.hints.map(h => ({ ...h, _loading: h._loading || false, content: h.content || h.description || '' }));
     }
-    const tagColors = {
-      intro: '#cfe2ff',
-      easy: '#7ec6b2',
-      medium: '#ffb347',
-      hard: '#b52a37',
-      insane: '#7d3cff'
+    const knownTagStyles = {
+      intro:  { background: '#cfe2ff', color: '#222' },
+      easy:   { background: '#7ec6b2', color: '#222' },
+      medium: { background: '#ffb347', color: '#222' },
+      hard:   { background: '#b52a37', color: '#fff' },
+      insane: { background: '#7d3cff', color: '#fff' },
     };
-    function tagBg(tag) {
+    function tagHue(str) {
+      let hash = 0;
+      for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
+      return hash % 360;
+    }
+    function tagStyle(tag) {
       const t = (tag.value || tag).toLowerCase();
-      return tagColors[t] || '#eee';
+      if (knownTagStyles[t]) {
+        const s = knownTagStyles[t];
+        return `background:${s.background};color:${s.color};`;
+      }
+      const hue = tagHue(t);
+      return `background:hsl(${hue},55%,28%);color:hsl(${hue},80%,85%);`;
     }
 
     // File links
@@ -752,7 +762,7 @@ export class CtfChallenge extends LitElement {
           ${ch.category ? html`<span class="meta-category">Category: <b>${ch.category}</b></span>` : ''}
           ${ch.tags && ch.tags.length ? html`
             <span class="meta-tags">
-              ${ch.tags.map(tag => html`<span class="inline-tag" style="background:${tagBg(tag)};color:#222;">${tag.value || tag}</span>`)}
+              ${ch.tags.map(tag => html`<span class="inline-tag" style="${tagStyle(tag)}">${tag.value || tag}</span>`)}
             </span>
           ` : ''}
           ${ch.value ? html`<span class="meta-points">Points: <b>${ch.value}</b></span>` : ''}
