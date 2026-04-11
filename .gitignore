@@ -14,4 +14,4 @@ node_modules/
 ctfd-helper.exe
 
 # Not directly used by this project
-misc/hackropole_dump.json
+misc/hackropole/
