@@ -5,7 +5,7 @@ Alternative web client interface for Capture The Flags events. It stores locally
 ### Preparation
 ```bash
 # Minimal requirement: Python3 with Flask
-apt install python3-pip
+apt install python3-pip unzip
 pip install Flask requests --break-system-packages # (or use python -m venv ctfd-helper)
 ```
 
