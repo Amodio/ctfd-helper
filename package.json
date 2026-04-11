@@ -4,8 +4,10 @@
   "description": "Alternative web client interface for Capture The Flags events.",
   "main": "main.js",
   "scripts": {
+    "clean": "rm -rf build/",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "rollup --config"
+    "dev": "rollup --config",
+    "build": "NODE_ENV=prod rollup --config"
   },
   "type": "module",
   "repository": {

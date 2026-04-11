@@ -23,20 +23,21 @@ Note: on Windows, you can also just directly use the bundled package (a bit slow
 git clone https://github.com/Amodio/ctfd-helper.git
 cd ctfd-helper/
 
-# For building the javascript/HTML source code (with rollup)
+# Node modules (dependencies)
 apt install npm rollup
 npm ci
 
-npm run build # required after cloning and each time JS/HTML src/ code is changed
+# Required after cloning and each time JS/HTML src/ code is changed
+npm run clean; npm run dev
 ./ctfd-helper.py
 ```
 
 ## Notes
-If you did not unlock all the challenges, some calculations (number of challenges, etc.) can differ from the scoreboard (we do not care about it).
+If you did not unlock all the challenges, some calculations (number of challenges and scores) can differ from the scoreboard (there is none currently inside this project).
 
 The final aim is to provide an interface for CTFd that would solve some challenges by itself.
 
 No automation in that regard is implemented yet, stay tuned :)
-Any help will be appreciated as the task is huge.
+Any help would be appreciated as the task is huge.
 
 Backend is powered by Python3/Flask, frontend by [Lit](https://lit.dev) (packed with rollup).
