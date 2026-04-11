@@ -126,7 +126,7 @@ def _fetch_challenge_details(category: str, challenge_uri: str, lang: str) -> di
             break
     # Fallback: extract year from URI
     if year == None:
-        m = re.match(r'(\d{4})', challenge_uri)
+        m = re.search(r'(\d{4})', challenge_uri)
         if m:
             year = int(m.group(1))
  
