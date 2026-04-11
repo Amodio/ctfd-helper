@@ -323,7 +323,7 @@ def main() -> None:
         help='Only download challenges from this category (e.g. crypto, forensics, hardware, misc, pwn, reverse, web).'
     )
     parser.add_argument(
-        '--only-details',
+        '-d', '--only-details',
         action='store_true',
         help='Only download challenge details (skip challenge files and writeups).'
     )
