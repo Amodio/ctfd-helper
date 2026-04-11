@@ -23,7 +23,7 @@ COPY --chmod=0755 <<__EOF__ /root/entrypoint.sh
 #!/bin/sh
 wine /python3/Scripts/pyinstaller.exe --distpath /mnt/  \\
     --add-data="/mnt/build/index.html:build"            \\
-    --add-data="/mnt/build/main.js:build"               \\
+    --add-data="/mnt/build/main*.js:build"               \\
     --onefile /mnt/ctfd-helper.py --exclude-module _ios_support
 rm -rf build/ ctfd-helper.spec
 __EOF__
