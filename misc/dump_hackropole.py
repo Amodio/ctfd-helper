@@ -23,6 +23,7 @@ rm -f hackropole/*/*/details.json
 """
 
 from bs4 import BeautifulSoup, Tag
+from datetime import timedelta
 from tqdm import tqdm
 import argparse
 import json
@@ -45,7 +46,6 @@ class CountingSession(requests.Session):
 
     def request(self, method, url, **kwargs):
         self.request_count += 1
-        logging.debug(f"{method} {url}")
         response = super().request(method, url, **kwargs)
         time.sleep(HTTP_REQUEST_INTERVAL / 1000)
         return response
@@ -344,7 +344,7 @@ def main() -> None:
 
     if args.category:
         challenges = [(cat, uri) for cat, uri in all_challenges if cat == args.category]
-        logging.info(f"Filtered to {len(challenges)} challenges in category '{args.category}'.")
+        logging.info(f"{len(challenges)} challenges in category '{args.category}'.")
     else:
         challenges = all_challenges
         logging.info(f"Found {len(challenges)} challenges.")
@@ -360,7 +360,7 @@ def main() -> None:
             process_challenge(category, challenge_uri, languages, args.only_details, pbar, fmt)
 
     elapsed = time.monotonic() - start
-    logging.info(f"Total HTTP requests made: {session.request_count} in {elapsed:.1f}s")
+    logging.info(f"Total HTTP requests made: {session.request_count} in {timedelta(seconds=elapsed)}.")
 
 if __name__ == '__main__':
     main()
