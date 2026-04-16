@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
+
 """
 import_hackropole.py — Import Hackropole CTF challenges into a local CTFd instance.
 
 Usage:
-    python import_hackropole.py [options]
+    ./import_hackropole.py [options]
 
 Options:
     --host HOST          CTFd host (default: localhost)
@@ -14,7 +15,7 @@ Options:
     --category CAT       Filter challenges by category (e.g. crypto)
     --lang LANG          Language for descriptions: en or fr (default: en)
     --dir DIR            Path to hackropole directory (default: ./hackropole)
-    --verbose            Print detailed HTTP activity
+    -v / --verbose       Print detailed HTTP activity
     -y / --yes           Skip confirmation prompt
 """
 
@@ -57,7 +58,7 @@ def vlog(msg: str) -> None:
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-DIFFICULTY_MAP = {0: 1, 1: 25, 2: 50, 3: 100, 4: 200, 5: 500}
+DIFFICULTY_MAP = {0: 1, 1: 100, 2: 200, 3: 300, 4: 400, 5: 500}
 
 def difficulty_to_value(d: Optional[int]) -> int:
     return DIFFICULTY_MAP.get(d, 100)

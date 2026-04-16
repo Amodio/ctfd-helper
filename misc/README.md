@@ -11,8 +11,7 @@ To test ctfd-helper, you can use it against a local CTFd.
 ```bash
 git clone https://github.com/CTFd/CTFd.git
 cp -rf hashed_flags/ CTFd/CTFd/plugins/ # We only have the sha256 of the flags
-docker compose --project-directory CTFd/ up -d
-./ctfd_setup.sh
+docker compose --project-directory CTFd/ up -d && ./ctfd_setup.sh
 ```
 
 ### Challenge injection
@@ -24,6 +23,5 @@ docker compose --project-directory CTFd/ up -d
 ### Cleanup
 
 ```bash
-docker compose --project-directory CTFd/ down
-sudo rm -rf CTFd/.data/
+docker compose --project-directory CTFd/ down && sudo rm -rf CTFd/.data/
 ```
