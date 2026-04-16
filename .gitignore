@@ -13,5 +13,6 @@ node_modules/
 # Windows PE binary
 ctfd-helper.exe
 
-# Not directly used by this project
+# Test on a local CTFd
 misc/hackropole/
+misc/CTFd/

@@ -4,22 +4,24 @@
 
 """
 This program dumps CTF challenges from Hackropole into a local directory:
-DATA_DIR/
-   //    category/
-   //       //    challenge-uri/
-   //       //          //      details.json
-   //       //          //      files/    <- if it contains any files
-   //       //          //      writeups/ <- if there are writeups
 
-By default, only english challenge details are retrieved, pass the `-a`
-or `--all-languages` argument to include both languages.
+<DATA_DIR>/
+└── <category>/
+    └── <challenge-uri>/
+        ├── details.json
+        ├── files/          # if it contains any files
+        └── writeups/       # if there are any writeups
 
-You can filter downloaded challenges with the `-c` or `--category` option.
-You can also download only the challenge details with: `--only-details`.
+By default, english challenge details are retrieved, pass the `-a` or
+`--all-languages` argument to include both en&fr languages.
 
-This program should not overwrite existing files.
+You can:
+  - filter downloaded challenges with the `-c` or `--category` option,
+  - download only the challenge details with: `-d` or `--only-details`.
+
 If you want to update your local writeups, delete the challenges' details:
-rm -f hackropole/*/*/details.json
+$ rm -f hackropole/*/*/details.json
+Directly deleting the writeups should not be that interesting.
 """
 
 from bs4 import BeautifulSoup, Tag
@@ -33,8 +35,8 @@ import re
 import requests
 import time
 
-BASE_URL = 'https://hackropole.fr'
 DATA_DIR = 'hackropole'
+BASE_URL = 'https://hackropole.fr'
 HTTP_REQUEST_INTERVAL = 337     # time to wait between each HTTP request in ms
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -162,8 +164,7 @@ def _fetch_challenge_details(category: str, challenge_uri: str, lang: str) -> di
     )
 
     # Instructions
-    instructions_raw = _extract_section_text(soup, 'Instructions')
-    instructions = [line.strip() for line in instructions_raw.split('\n') if line.strip()]
+    instructions = _extract_section_text(soup, 'Instructions')
 
     # Flag format
     flag_in = soup.select_one('#flag-form input#flag')
@@ -278,7 +279,7 @@ def process_challenge(category: str, challenge_uri: str, languages: list[str],
     if only_details:
         return
 
-    def set_file(name):
+    def set_file(name) -> None:
         if pbar is not None:
             challenge_path = f"{category}/{challenge_uri}"
             suffix = f" ({name})" if name else ""
@@ -316,21 +317,21 @@ def main() -> None:
     parser.add_argument(
         '-a', '--all-languages',
         action='store_true',
-        help='Download challenge details in both English and French (default: English only).'
+        help='Download challenge details in both English and French (default: English only)'
     )
     parser.add_argument(
         '-c', '--category',
-        help='Only download challenges from this category (e.g. crypto, forensics, hardware, misc, pwn, reverse, web).'
+        help='Only download challenges from this category (e.g. crypto, forensics, hardware, misc, pwn, reverse, web)'
     )
     parser.add_argument(
         '-d', '--only-details',
         action='store_true',
-        help='Only download challenge details (skip challenge files and writeups).'
+        help='Only download challenge details (skip challenge files and writeups)'
     )
     parser.add_argument(
         '-v', '--verbose',
         action='store_true',
-        help="Log every HTTP request."
+        help="Log every HTTP request"
     )
     args = parser.parse_args()
 
