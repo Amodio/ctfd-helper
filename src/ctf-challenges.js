@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit';
 
 import './ctf-challenge.js';
+import './ctf-scoreboard-box.js';
 
 export class CtfChallenges extends LitElement {
   static properties = {
@@ -12,6 +13,7 @@ export class CtfChallenges extends LitElement {
     open: { type: Boolean },
     login: { type: String },
     slowRefresh: { type: Number },
+    showScoreboard: { type: Boolean },
   };
 
   static styles = css`
@@ -239,6 +241,7 @@ export class CtfChallenges extends LitElement {
     this.updatingChallengeId = null;
     this.isLoading = false;
     this.slowRefresh = 0;
+    this.showScoreboard = false;
     const loginLocal = localStorage.getItem('last-ctf-login');
     this._login = loginLocal || '';
   }
@@ -416,6 +419,15 @@ export class CtfChallenges extends LitElement {
         }
       }
 
+      // After a full challenge refresh, mark scoreboard computed scores as stale
+      // so the next open re-fetches from /computed_scores.
+      // Do NOT wipe _computedScores: the merge in _computeScores() preserves
+      // players who were banned and therefore removed from CTFd's solve lists.
+      if (forceRefresh) {
+        const scoreboardEl = this.shadowRoot?.querySelector('ctf-scoreboard-box');
+        if (scoreboardEl) scoreboardEl._scoresComputed = false;
+      }
+
     } catch (e) {
       if (e.name === 'AbortError') return;
       this.ctfData.challenges = [];
@@ -575,6 +587,12 @@ export class CtfChallenges extends LitElement {
                 }
               }}
             >🔄</button>
+            <button
+              title="Scoreboard"
+              class="refresh-all-btn"
+              style="font-size:1.6em;background:transparent;border:none;cursor:pointer;padding:0.1em;"
+              @click=${() => { this.showScoreboard = true; this.requestUpdate(); }}
+            >🏆</button>
           </div>
           <div class="toolbar-center">
             ${ctfName ? html`<span class="ctf-title">${ctfName}</span>` : ''}
@@ -719,6 +737,12 @@ export class CtfChallenges extends LitElement {
             ></ctf-challenge>
           </div>
         ` : ''}
+
+        <ctf-scoreboard-box
+          .ctfId=${this.ctfId}
+          .open=${this.showScoreboard}
+          @close-scoreboard=${() => { this.showScoreboard = false; this.requestUpdate(); }}
+        ></ctf-scoreboard-box>
       </div>
     `;
   }

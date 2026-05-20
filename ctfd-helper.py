@@ -669,14 +669,34 @@ def _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data=None):
             else:
                 return None, f"CTFd API error: {r.status_code} {r.text}"
         data = r.json()
-        solves = data.get('data', [])
-        # Cache the solves in ctf_data
+        fresh_solves = data.get('data', [])
+        fresh_ids = {str(s.get('account_id')) for s in fresh_solves}
+
+        # Maintain ghost_solves: solvers absent from fresh CTFd data (likely banned).
+        # Their entries are kept so /computed_scores can recompute with current values.
         if 'solves' not in ctf_data:
             ctf_data['solves'] = {}
-        ctf_data['solves'][cache_key] = solves
+        if 'ghost_solves' not in ctf_data:
+            ctf_data['ghost_solves'] = {}
+
+        existing_cached = ctf_data['solves'].get(cache_key, [])
+        existing_ghost  = ctf_data['ghost_solves'].get(cache_key, [])
+        ghost_ids       = {str(s.get('account_id')) for s in existing_ghost}
+
+        # Solvers in old cache but gone from CTFd → add to ghost (once only)
+        for s in existing_cached:
+            aid = str(s.get('account_id'))
+            if aid not in fresh_ids and aid not in ghost_ids:
+                existing_ghost.append(s)
+
+        # Solvers back in CTFd → remove from ghost (they were unbanned)
+        existing_ghost = [s for s in existing_ghost if str(s.get('account_id')) not in fresh_ids]
+
+        ctf_data['solves'][cache_key]       = fresh_solves
+        ctf_data['ghost_solves'][cache_key] = existing_ghost
         if update_ctf_cache(ctf_id, ctf_data) == False:
             return None, 'Failed to update CTF data'
-        return solves, None
+        return fresh_solves, None
     except Exception as e:
         return None, f"Exception occurred: {e}"
 
@@ -687,6 +707,66 @@ def get_challenge_solves(ctf_id, chall_id):
     if err:
         return jsonify({'error': err}), 500 if 'Exception' in err or 'Failed' in err else 404
     return jsonify({'solves': solves})
+
+@app.route('/scoreboard/<int:ctf_id>', methods=['GET'])
+def get_scoreboard(ctf_id):
+    """Proxy the CTFd scoreboard API for a given CTF."""
+    ctf_data = load_ctf_cache(ctf_id)
+    if ctf_data is None:
+        return jsonify({'error': f"CTF #{ctf_id} not found"}), 404
+    url      = ctf_data.get('url')
+    login    = ctf_data.get('login')
+    password = ctf_data.get('password')
+    if not url or not login or not password:
+        return jsonify({'error': 'Missing CTF credentials'}), 400
+    token = ctf_data.get('token')
+    if not token:
+        token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
+        if not token:
+            return jsonify({'error': f"Could not fetch session token: {err}"}), 502
+    headers = {'Cookie': f"session={token}"}
+    print(f"[DBG] Fetching scoreboard for CTF @ {url}")
+    try:
+        r = requests.get(f"{url}/api/v1/scoreboard", headers=headers, timeout=30)
+        if r.status_code == 401:
+            token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
+            if not token:
+                return jsonify({'error': f"Could not fetch session token: {err}"}), 502
+            headers = {'Cookie': f"session={token}"}
+            r = requests.get(f"{url}/api/v1/scoreboard", headers=headers, timeout=30)
+        if not r.ok:
+            return jsonify({'error': f"CTFd API error: {r.status_code} {r.text}"}), 502
+        return jsonify(r.json())
+    except Exception as e:
+        return jsonify({'error': f"Exception fetching scoreboard: {e}"}), 500
+
+@app.route('/computed_scores/<int:ctf_id>', methods=['GET'])
+def get_computed_scores(ctf_id):
+    """Aggregate per-user scores from cached solve lists plus ghost_solves (banned players).
+    Both sets are scored against current challenge values so dynamic scoring stays accurate.
+    Never triggers a remote fetch — only reads what the challenge refresh already stored."""
+    ctf_data = load_ctf_cache(ctf_id)
+    if ctf_data is None:
+        return jsonify({'error': f"CTF #{ctf_id} not found"}), 404
+    challenges    = ctf_data.get('challenges') or []
+    cached_solves = ctf_data.get('solves') or {}
+    ghost_solves  = ctf_data.get('ghost_solves') or {}
+    scores = {}   # str(account_id) -> { name, score }
+    for ch in challenges:
+        ch_id = ch.get('id')
+        val   = int(ch.get('value') or 0)
+        if not ch_id:
+            continue
+        key = str(ch_id)
+        # Regular solvers + ghost solvers scored at current challenge value
+        for s in (cached_solves.get(key) or []) + (ghost_solves.get(key) or []):
+            aid = str(s.get('account_id', ''))
+            if not aid:
+                continue
+            if aid not in scores:
+                scores[aid] = {'name': s.get('name', f'#{aid}'), 'score': 0}
+            scores[aid]['score'] += val
+    return jsonify({'scores': scores})
 
 @app.route('/ctfd_title', methods=['POST'])
 def get_ctfd_title():
