@@ -1,5 +1,9 @@
 import { LitElement, html, css } from 'lit';
 
+// Module-level cache: survives ctf-scoreboard-box destruction/recreation.
+// ctfId -> { scoreboard: [...], fetchedAt: Date }
+const _cache = {};
+
 export class CtfScoreboardBox extends LitElement {
   static properties = {
     ctfId:               { type: Number },
@@ -213,7 +217,8 @@ export class CtfScoreboardBox extends LitElement {
       else           this.removeAttribute('open');
     }
 
-    // When CTF changes, wipe all cached state so next open re-fetches cleanly
+    // When CTF changes, wipe cached state and immediately fetch the scoreboard
+    // so the rank chip in ctf-challenges is populated without needing to open the panel.
     if (changedProps.has('ctfId') && this.ctfId !== changedProps.get('ctfId')) {
       this._fetched             = false;
       this._scoresComputed      = false;
@@ -221,11 +226,12 @@ export class CtfScoreboardBox extends LitElement {
       this._computedScores      = {};
       this._scoreboardFetchedAt = null;
       this._error               = '';
+      this._fetchScoreboard();
     }
 
-    // On first open: lazily fetch scoreboard + compute scores (both once per ctfId).
+    // On first open: compute scores (scoreboard already fetched eagerly above).
     if (changedProps.has('open') && this.open) {
-      if (!this._fetched)        this._fetchScoreboard();
+      if (!this._fetched)        this._fetchScoreboard();   // fallback if ctfId was already set
       if (!this._scoresComputed) this._computeScores();
     }
   }
@@ -234,6 +240,37 @@ export class CtfScoreboardBox extends LitElement {
 
   async _fetchScoreboard() {
     if (!this.ctfId) return;
+
+    // 1. In-memory cache (survives component recreation within the same JS context)
+    if (_cache[this.ctfId]) {
+      this._scoreboard          = _cache[this.ctfId].scoreboard;
+      this._fetched             = true;
+      this._scoreboardFetchedAt = _cache[this.ctfId].fetchedAt;
+      this.dispatchEvent(new CustomEvent('scoreboard-updated', {
+        detail: { scoreboard: this._scoreboard },
+        bubbles: true, composed: true,
+      }));
+      return;
+    }
+
+    // 2. sessionStorage cache (survives page reloads within the browser tab session)
+    try {
+      const stored = sessionStorage.getItem(`scoreboard_${this.ctfId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        _cache[this.ctfId] = { scoreboard: parsed.scoreboard, fetchedAt: new Date(parsed.fetchedAt) };
+        this._scoreboard          = _cache[this.ctfId].scoreboard;
+        this._fetched             = true;
+        this._scoreboardFetchedAt = _cache[this.ctfId].fetchedAt;
+        this.dispatchEvent(new CustomEvent('scoreboard-updated', {
+          detail: { scoreboard: this._scoreboard },
+          bubbles: true, composed: true,
+        }));
+        return;
+      }
+    } catch {}
+
+    // 3. Network fetch — only when both caches miss
     this._loading = true;
     this._error   = '';
     try {
@@ -244,6 +281,17 @@ export class CtfScoreboardBox extends LitElement {
       this._scoreboard          = Array.isArray(data.data) ? data.data : [];
       this._fetched             = true;
       this._scoreboardFetchedAt = new Date();
+      _cache[this.ctfId] = { scoreboard: this._scoreboard, fetchedAt: this._scoreboardFetchedAt };
+      try {
+        sessionStorage.setItem(`scoreboard_${this.ctfId}`, JSON.stringify({
+          scoreboard: this._scoreboard,
+          fetchedAt:  this._scoreboardFetchedAt.toISOString(),
+        }));
+      } catch {}
+      this.dispatchEvent(new CustomEvent('scoreboard-updated', {
+        detail: { scoreboard: this._scoreboard },
+        bubbles: true, composed: true,
+      }));
     } catch (e) {
       this._error = `Failed to load scoreboard: ${e.message}`;
     } finally {
@@ -279,8 +327,9 @@ export class CtfScoreboardBox extends LitElement {
   }
 
   async _refresh() {
-    // Only re-fetch the live scoreboard from CTFd.
-    // Solve-based score computation is triggered by the main challenge refresh.
+    // Clear both cache layers so _fetchScoreboard goes to the server.
+    delete _cache[this.ctfId];
+    try { sessionStorage.removeItem(`scoreboard_${this.ctfId}`); } catch {}
     await this._fetchScoreboard();
   }
 

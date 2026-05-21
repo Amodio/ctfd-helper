@@ -3,6 +3,11 @@ import { LitElement, html, css } from 'lit';
 import './ctf-challenge.js';
 import './ctf-scoreboard-box.js';
 
+// Module-level rank cache: ctfId -> { name -> pos, account_id_str -> pos }
+// Populated passively when ctf-scoreboard-box dispatches 'scoreboard-updated'.
+// Never triggers its own network request.
+const _rankCache = {};
+
 export class CtfChallenges extends LitElement {
   static properties = {
     ctfId: { type: Number },
@@ -143,6 +148,19 @@ export class CtfChallenges extends LitElement {
       font-size: 0.9em;
       color: #555;
     }
+    .rank-chip {
+      display: inline-block;
+      background: #1a3a5c;
+      color: #7fffd4;
+      border: 1px solid #2a5a8c;
+      border-radius: 4px;
+      padding: 0.05em 0.45em;
+      font-size: 0.88em;
+      font-family: monospace;
+      font-weight: bold;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
 
     /* Challenge table */
     .challenges-table-wrap {
@@ -241,7 +259,7 @@ export class CtfChallenges extends LitElement {
     this.updatingChallengeId = null;
     this.isLoading = false;
     this.slowRefresh = 0;
-    this.showScoreboard = false;
+    this.showScoreboard  = false;
     const loginLocal = localStorage.getItem('last-ctf-login');
     this._login = loginLocal || '';
   }
@@ -498,6 +516,19 @@ export class CtfChallenges extends LitElement {
       }
       this.requestUpdate();
     });
+    // Passively receive scoreboard data from ctf-scoreboard-box (composed event).
+    // Never fetches the scoreboard independently — rank cache is populated here only.
+    this.addEventListener('scoreboard-updated', (e) => {
+      const scoreboard = e.detail?.scoreboard;
+      if (!scoreboard || !this.ctfId) return;
+      const map = {};
+      for (const entry of scoreboard) {
+        if (entry.name)       map[entry.name]                  = entry.pos;
+        if (entry.account_id) map[String(entry.account_id)]    = entry.pos;
+      }
+      _rankCache[this.ctfId] = map;
+      this.requestUpdate();
+    });
   }
 
   toggleHideSolved() {
@@ -560,6 +591,12 @@ export class CtfChallenges extends LitElement {
       ctfName = ctfData.name;
     }
 
+    // Rank from the passively-populated cache (set when scoreboard-updated fires)
+    const _cache = _rankCache[this.ctfId] || {};
+    const cleanRank = _cache[displayName]
+      ?? (this.userId != null ? _cache[String(this.userId)] : undefined)
+      ?? null;
+
     // Points summary
     let solvedPoints = 0;
     let totalPoints = 0;
@@ -614,6 +651,7 @@ export class CtfChallenges extends LitElement {
 
         <h2 class="stats-row">
           ${displayName ? html`<span class="ctf-login">${displayName}</span>` : ''}
+          ${cleanRank !== null ? html`<span class="rank-chip">#${cleanRank}</span>` : ''}
           <span class="stats-pct">
             ${solved}/${total} solved (${total > 0 ? Math.round((solved/total)*100) : 0}%)
             | ${solvedPoints}/${totalPoints} pts

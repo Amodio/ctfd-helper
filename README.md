@@ -33,11 +33,9 @@ npm run clean; npm run dev
 ```
 
 ## Notes
-If you did not unlock all the challenges, some calculations (number of challenges and scores) can differ from the scoreboard (there is none currently inside this project).
+If you did not unlock all the challenges, some calculations (number of challenges and scores) can differ from the scoreboard.
 
 The final aim is to provide an interface for CTFd that would solve some challenges by itself.
-
-No automation in that regard is implemented yet, stay tuned :)
-Any help would be appreciated as the task is huge.
+No automation in that regard is implemented yet.
 
 Backend is powered by Python3/Flask, frontend by [Lit](https://lit.dev) (packed with rollup).
