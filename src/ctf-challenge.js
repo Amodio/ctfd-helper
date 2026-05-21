@@ -429,6 +429,13 @@ export class CtfChallenge extends LitElement {
       } else {
         this.challenge.hints = [];
       }
+      // Notify parent list so it can sync the fresh solve count (and other fields) back
+      // into ctfData.challenges without requiring a full force-refresh.
+      this.dispatchEvent(new CustomEvent('challenge-updated', {
+        bubbles: true,
+        composed: true,
+        detail: { challenge: this.challenge }
+      }));
     } catch (e) {
       this.error_str = 'Failed to load challenge info.';
     } finally {

@@ -496,6 +496,20 @@ export class CtfChallenges extends LitElement {
   }
 
   firstUpdated() {
+    // When the challenge modal fetches fresh data, sync updated fields (e.g. solves)
+    // back into the list so the count stays accurate without a full force-refresh.
+    this.addEventListener('challenge-updated', (e) => {
+      const updated = e.detail?.challenge;
+      if (!updated || !updated.id) return;
+      const challenges = (this.ctfData && this.ctfData.challenges) || [];
+      const ch = challenges.find(c => c.id === updated.id);
+      if (ch) {
+        if (typeof updated.solves === 'number') ch.solves = updated.solves;
+        if (typeof updated.value  === 'number') ch.value  = updated.value;
+        this.ctfData = { ...this.ctfData, challenges: [...challenges] };
+        this.requestUpdate();
+      }
+    });
     this.addEventListener('challenge-solved', (e) => {
       const { challengeId } = e.detail;
       const challenges = (this.ctfData && this.ctfData.challenges) || [];
