@@ -400,6 +400,7 @@ export class CtfChallenges extends LitElement {
               }
               if (typeof det.attempts === 'number') ch.attempts = det.attempts;
               if (typeof det.max_attempts === 'number') ch.max_attempts = det.max_attempts;
+              if (typeof det.solves === 'number') ch.solves = det.solves;
               reapplyTransientState(fetchOrder);
               this.ctfData.challenges = [...fetchOrder];
               this.requestUpdate();
@@ -496,8 +497,9 @@ export class CtfChallenges extends LitElement {
   }
 
   firstUpdated() {
-    // When the challenge modal fetches fresh data, sync updated fields (e.g. solves)
-    // back into the list so the count stays accurate without a full force-refresh.
+    // When the challenge popup fetches fresh data (on open, force-refresh, or after
+    // viewing solves), sync the updated solve count back into the list row so it
+    // stays accurate without a full force-refresh of every challenge.
     this.addEventListener('challenge-updated', (e) => {
       const updated = e.detail?.challenge;
       if (!updated || !updated.id) return;
@@ -507,8 +509,19 @@ export class CtfChallenges extends LitElement {
         if (typeof updated.solves === 'number') ch.solves = updated.solves;
         if (typeof updated.value  === 'number') ch.value  = updated.value;
         this.ctfData = { ...this.ctfData, challenges: [...challenges] };
-        this.requestUpdate();
       }
+      // Crucially: also update selectedChallenge. ctf-challenges re-renders when
+      // ctfData changes and passes .challenge=${this.selectedChallenge} back into
+      // ctf-challenge. If selectedChallenge still has the stale count, the setter
+      // overwrites ctf-challenge's freshly-updated internal state with the old value.
+      if (this.selectedChallenge && String(this.selectedChallenge.id) === String(updated.id)) {
+        this.selectedChallenge = {
+          ...this.selectedChallenge,
+          ...(typeof updated.solves === 'number' && { solves: updated.solves }),
+          ...(typeof updated.value  === 'number' && { value:  updated.value }),
+        };
+      }
+      this.requestUpdate();
     });
     this.addEventListener('challenge-solved', (e) => {
       const { challengeId } = e.detail;

@@ -164,6 +164,9 @@ def get_challenges(ctf_id):
                 ch['attempts'] = det['attempts']
             if 'max_attempts' in det:
                 ch['max_attempts'] = det['max_attempts']
+            # The detail cache is fresher than the list cache for solve counts.
+            if 'solves' in det:
+                ch['solves'] = det['solves']
     return jsonify(ctf_data)
 
 def fetch_challenge(url, login, password, ctf_id, ch_id, ctf_data=None):
@@ -642,8 +645,20 @@ def _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data=None):
             summary_solves = int(challenge_summary['solves'])
         except Exception:
             pass
+    # The detail cache (ctf_data['challenge']) is populated by get_challenge and is
+    # fresher than the list cache (ctf_data['challenges']).  Take the max of both so
+    # a single new solve is never silently skipped (e.g. list says 475, detail says 476).
+    for det in ctf_data.get('challenge', []):
+        if str(det.get('id')) == cache_key:
+            try:
+                det_solves = int(det.get('solves', 0))
+                if summary_solves is None or det_solves > summary_solves:
+                    summary_solves = det_solves
+            except Exception:
+                pass
+            break
     cached_solves = solves.get(cache_key, [])
-    # Only fetch if the number of solves in summary does not match the cache length
+    # Only fetch when the cached list length does not match the expected count.
     if summary_solves is not None and len(cached_solves) == summary_solves:
         return cached_solves, None
     token = ctf_data.get('token')
@@ -694,6 +709,20 @@ def _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data=None):
 
         ctf_data['solves'][cache_key]       = fresh_solves
         ctf_data['ghost_solves'][cache_key] = existing_ghost
+
+        # Propagate the authoritative solve count back into both the list cache
+        # and the detail cache so every subsequent read (page reload, list view,
+        # popup reopen) reflects the freshly fetched number.
+        fresh_count = len(fresh_solves)
+        for ch in ctf_data.get('challenges', []):
+            if str(ch.get('id')) == cache_key:
+                ch['solves'] = fresh_count
+                break
+        for ch in ctf_data.get('challenge', []):
+            if str(ch.get('id')) == cache_key:
+                ch['solves'] = fresh_count
+                break
+
         if update_ctf_cache(ctf_id, ctf_data) == False:
             return None, 'Failed to update CTF data'
         return fresh_solves, None

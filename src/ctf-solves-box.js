@@ -121,6 +121,13 @@ export class CtfSolvesBox extends LitElement {
       if (!resp.ok) throw new Error('Failed to fetch solves');
       const data = await resp.json();
       this.solves = Array.isArray(data.solves) ? data.solves : [];
+      // Tell the parent challenge component the authoritative count so it updates
+      // its displayed number without needing to be closed and reopened.
+      this.dispatchEvent(new CustomEvent('solves-fetched', {
+        bubbles: true,
+        composed: true,
+        detail: { challengeId: this.challengeId, count: this.solves.length }
+      }));
     } catch (e) {
       this.error = 'Failed to load solves.';
     } finally {

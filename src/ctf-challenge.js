@@ -429,11 +429,10 @@ export class CtfChallenge extends LitElement {
       } else {
         this.challenge.hints = [];
       }
-      // Notify parent list so it can sync the fresh solve count (and other fields) back
-      // into ctfData.challenges without requiring a full force-refresh.
+      // Notify the parent challenge list so it can sync the fresh solve count
+      // back into ctfData.challenges without needing a full force-refresh.
       this.dispatchEvent(new CustomEvent('challenge-updated', {
-        bubbles: true,
-        composed: true,
+        bubbles: true, composed: true,
         detail: { challenge: this.challenge }
       }));
     } catch (e) {
@@ -800,6 +799,16 @@ export class CtfChallenge extends LitElement {
             .challengeId=${this._solvesBoxChallengeId}
             .open=${this.showSolvesBox}
             @close-solves-box=${() => { this.showSolvesBox = false; this.requestUpdate(); }}
+            @solves-fetched=${(e) => {
+              const ch = this.challenge;
+              if (ch && typeof e.detail.count === 'number') {
+                this.challenge = { ...ch, solves: e.detail.count };
+                this.dispatchEvent(new CustomEvent('challenge-updated', {
+                  bubbles: true, composed: true,
+                  detail: { challenge: this.challenge }
+                }));
+              }
+            }}
           ></ctf-solves-box>
         ` : ''}
       </div>
