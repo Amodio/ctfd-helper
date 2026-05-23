@@ -99,18 +99,17 @@ export class CtfScoreboardBox extends LitElement {
     .refresh-btn:hover:not(:disabled) { opacity: 0.7; }
     .refresh-btn:disabled { opacity: 0.3; cursor: default; }
     .close-btn {
-      font-size: 1.5em;
-      background: transparent;
+      background: #dc3545;
+      color: #fff;
       border: none;
       border-radius: 4px;
+      padding: 0.2em 0.5em;
       cursor: pointer;
-      padding: 0.05em 0.15em;
-      line-height: 1;
-      color: #e05060;
+      font-size: 1.1em;
       user-select: none;
-      transition: opacity 0.15s;
+      line-height: 1;
     }
-    .close-btn:hover { opacity: 0.7; }
+    .close-btn:hover { background: #b52a37; }
 
     /* ── status bar ──────────────────────────────────── */
     .status-bar {
@@ -512,7 +511,7 @@ export class CtfScoreboardBox extends LitElement {
             @click=${() => this._refresh()}
             ?disabled=${this._loading || this._computing}
           >${this._loading ? '⏳' : '🔄'}</button>
-          <button class="close-btn" title="Close" @click=${() => this._close()}>✕</button>
+          <button class="close-btn" @click=${() => this._close()}>&times;</button>
         </div>
 
         <!-- status bar: scoreboard fetch time only -->
