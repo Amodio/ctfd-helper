@@ -424,16 +424,20 @@ export class CtfScoreboardBox extends LitElement {
       // Group 1 — Banned: computed score > 0 but entirely absent from the official scoreboard
       const bannedGroup = bannedEntries
         .slice().sort((a, b) => b.computed_score - a.computed_score)
-        .map(b => ({
-          account_id:     Number(b.account_id),
-          name:           b.name,
-          pos_clean:      null,
-          score:          null,
-          computed_score: b.computed_score,
-          banned:         true,
-          group:          'banned',
-          listingRank:    null,
-        }));
+        .map((b, idx) => {
+          const above = normalRows.filter(r => r.score > b.computed_score).length;
+          return {
+            account_id:     Number(b.account_id),
+            name:           b.name,
+            pos_clean:      null,
+            score:          null,
+            computed_score: b.computed_score,
+            banned:         true,
+            group:          'banned',
+            listingRank:    null,
+            pos_full:       above + idx + 1,
+          };
+        });
 
       // Group 2 — Mismatch: in the official scoreboard but computed_score ≠ official score
       const mismatchGroup = hasComputed
@@ -488,7 +492,7 @@ export class CtfScoreboardBox extends LitElement {
     // Always render — never return early — so the DOM node persists and
     // _fetched / _computedScores survive open/close cycles.
     const { rows, hasComputed, hasBanned, monkeyMode } = this._buildRows();
-    const colCount = monkeyMode ? 5 : (4 + (hasComputed ? 2 : 0));
+    const colCount = monkeyMode ? 6 : (4 + (hasComputed ? 2 : 0));
 
     const sbMins = this._minutesAgo(this._scoreboardFetchedAt);
 
@@ -528,7 +532,8 @@ export class CtfScoreboardBox extends LitElement {
             <thead>
               <tr>
                 ${monkeyMode ? html`
-                  <th class="td-pos-full" title="Rank within this filtered listing">#</th>
+                  <th class="td-pos-full" title="Full rank (banned players re-inserted)"># full</th>
+                  <th class="td-pos-full" title="Rank within this filtered listing"># list</th>
                   <th>Name</th>
                   <th style="text-align:right;" title="Official score from CTFd">Score</th>
                   <th class="td-computed" title="Computed score from cached solves">Computed</th>
@@ -579,6 +584,7 @@ export class CtfScoreboardBox extends LitElement {
                   const isBanned = entry.banned;
                   return html`
                     <tr class="${isBanned ? 'banned-row' : ''}">
+                      <td class="td-pos-full">${entry.pos_full ?? '—'}</td>
                       <td class="td-pos-full">${entry.listingRank}</td>
                       <td class="td-name">
                         <a href=${this._playerHref(entry)} target="_blank">${entry.name}</a>
