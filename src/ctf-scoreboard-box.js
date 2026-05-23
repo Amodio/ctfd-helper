@@ -231,6 +231,7 @@ export class CtfScoreboardBox extends LitElement {
 
     // On first open: compute scores (scoreboard already fetched eagerly above).
     if (changedProps.has('open') && this.open) {
+      this._hideNotBanned = false;   // never remember monkey state across opens
       if (!this._fetched)        this._fetchScoreboard();   // fallback if ctfId was already set
 
       // Sync from the module cache in case another instance (e.g. the normal
@@ -420,10 +421,41 @@ export class CtfScoreboardBox extends LitElement {
       .sort((a, b) => (a.pos_full ?? 99999) - (b.pos_full ?? 99999));
 
     if (this._hideNotBanned) {
-      allRows = bannedRows.sort((a, b) => a.pos_full - b.pos_full);
+      // Group 1 — Banned: computed score > 0 but entirely absent from the official scoreboard
+      const bannedGroup = bannedEntries
+        .slice().sort((a, b) => b.computed_score - a.computed_score)
+        .map(b => ({
+          account_id:     Number(b.account_id),
+          name:           b.name,
+          pos_clean:      null,
+          score:          null,
+          computed_score: b.computed_score,
+          banned:         true,
+          group:          'banned',
+          listingRank:    null,
+        }));
+
+      // Group 2 — Mismatch: in the official scoreboard but computed_score ≠ official score
+      const mismatchGroup = hasComputed
+        ? normalRows
+            .filter(r => r.computed_score !== null && r.computed_score !== r.score)
+            .slice().sort((a, b) => a.pos_clean - b.pos_clean)
+            .map(r => ({ ...r, group: 'different', listingRank: null }))
+        : [];
+
+      // Assign a sequential rank across both groups combined
+      let rank = 1;
+      for (const r of [...bannedGroup, ...mismatchGroup]) r.listingRank = rank++;
+
+      const rows = [
+        ...(bannedGroup.length   > 0 ? [{ isHeader: true, label: '🚫 Banned' },          ...bannedGroup]   : []),
+        ...(mismatchGroup.length > 0 ? [{ isHeader: true, label: '⚠️ Score mismatch' }, ...mismatchGroup] : []),
+      ];
+
+      return { rows, hasComputed: true, hasBanned, monkeyMode: true };
     }
 
-    return { rows: allRows, hasComputed, hasBanned };
+    return { rows: allRows, hasComputed, hasBanned, monkeyMode: false };
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
@@ -455,8 +487,8 @@ export class CtfScoreboardBox extends LitElement {
   render() {
     // Always render — never return early — so the DOM node persists and
     // _fetched / _computedScores survive open/close cycles.
-    const { rows, hasComputed, hasBanned } = this._buildRows();
-    const colCount = (this._hideNotBanned ? 2 : 4) + (hasComputed ? 2 : 0);
+    const { rows, hasComputed, hasBanned, monkeyMode } = this._buildRows();
+    const colCount = monkeyMode ? 5 : (4 + (hasComputed ? 2 : 0));
 
     const sbMins = this._minutesAgo(this._scoreboardFetchedAt);
 
@@ -468,7 +500,7 @@ export class CtfScoreboardBox extends LitElement {
           ${this._computing ? html`<span style="font-size:0.82em;color:#ffd700;">⚙️ computing…</span>` : ''}
           <button
             class="monkey-toggle"
-            title="${this._hideNotBanned ? 'Show everyone' : 'Show only banned players'}"
+            title="${this._hideNotBanned ? 'Show everyone' : 'Show players with score discrepancies'}"
             @click=${() => { this._hideNotBanned = !this._hideNotBanned; }}
           >${this._hideNotBanned ? '🙈' : '🐵'}</button>
           <button class="refresh-btn"
@@ -495,39 +527,73 @@ export class CtfScoreboardBox extends LitElement {
           <table>
             <thead>
               <tr>
-                <th class="td-pos-full"
-                    title="Rank if banned players were re-inserted by their computed score">
-                  # full
-                </th>
-                ${!this._hideNotBanned ? html`
+                ${monkeyMode ? html`
+                  <th class="td-pos-full" title="Rank within this filtered listing">#</th>
+                  <th>Name</th>
+                  <th style="text-align:right;" title="Official score from CTFd">Score</th>
+                  <th class="td-computed" title="Computed score from cached solves">Computed</th>
+                  <th class="td-status">Status</th>
+                ` : html`
+                  <th class="td-pos-full"
+                      title="Rank if banned players were re-inserted by their computed score">
+                    # full
+                  </th>
                   <th class="td-pos-clean"
                       title="Official rank — banned players already removed by CTFd">
                     # clean
                   </th>
-                ` : ''}
-                <th>Name</th>
-                ${!this._hideNotBanned ? html`
+                  <th>Name</th>
                   <th style="text-align:right;" title="Official score from CTFd">Score</th>
-                ` : ''}
-                ${hasComputed ? html`
-                  <th class="td-computed"
-                      title="Sum of current challenge point values for all solved challenges">
-                    Computed
-                  </th>
-                  <th class="td-status">Status</th>
-                ` : ''}
+                  ${hasComputed ? html`
+                    <th class="td-computed"
+                        title="Sum of current challenge point values for all solved challenges">
+                      Computed
+                    </th>
+                    <th class="td-status">Status</th>
+                  ` : ''}
+                `}
               </tr>
             </thead>
             <tbody>
               ${rows.length === 0 ? html`
                 <tr><td class="empty-msg" colspan="${colCount}">
-                  ${this._hideNotBanned
-                    ? (this._computing ? 'Computing…' : 'No banned players detected.')
+                  ${monkeyMode
+                    ? (this._computing ? 'Computing…' : 'No discrepancies detected.')
                     : 'No scoreboard data yet.'}
                 </td></tr>
               ` : ''}
 
               ${rows.map(entry => {
+                // Group header row (monkey mode only)
+                if (entry.isHeader) return html`
+                  <tr>
+                    <td colspan="${colCount}"
+                        style="padding:0.5em 0.5em 0.2em;font-size:0.82em;color:#7fffd4;
+                               letter-spacing:0.05em;border-bottom:1px solid #2a4a3a;
+                               background:#111;">
+                      ${entry.label}
+                    </td>
+                  </tr>`;
+
+                if (monkeyMode) {
+                  const isBanned = entry.banned;
+                  return html`
+                    <tr class="${isBanned ? 'banned-row' : ''}">
+                      <td class="td-pos-full">${entry.listingRank}</td>
+                      <td class="td-name">
+                        <a href=${this._playerHref(entry)} target="_blank">${entry.name}</a>
+                      </td>
+                      <td class="td-score">${entry.score !== null ? entry.score : '—'}</td>
+                      <td class="td-computed">${entry.computed_score !== null ? entry.computed_score : '?'}</td>
+                      <td class="td-status">
+                        ${isBanned
+                          ? html`<span class="badge banned-badge">BANNED</span>`
+                          : html`<span class="badge mismatch-badge"
+                                      title="Computed score differs from official score">⚠ diff</span>`}
+                      </td>
+                    </tr>`;
+                }
+
                 const scoreMismatch = hasComputed
                   && !entry.banned
                   && entry.computed_score !== null
@@ -543,31 +609,20 @@ export class CtfScoreboardBox extends LitElement {
 
                 return html`
                   <tr class="${entry.banned ? 'banned-row' : ''}">
-
                     <td class="td-pos-full">
                       ${entry.pos_full !== null ? html`${entry.pos_full}` : '🚫'}
                     </td>
-
-                    ${!this._hideNotBanned ? html`
-                      <td class="td-pos-clean">
-                        ${entry.pos_clean !== null
-                          ? html`${entry.pos_clean}${deltaChip}`
-                          : html`<span style="color:#552233;">—</span>`}
-                      </td>
-                    ` : ''}
-
-                    <td class="td-name">
-                      <a href=${this._playerHref(entry)} target="_blank">
-                        ${entry.name}
-                      </a>
+                    <td class="td-pos-clean">
+                      ${entry.pos_clean !== null
+                        ? html`${entry.pos_clean}${deltaChip}`
+                        : html`<span style="color:#552233;">—</span>`}
                     </td>
-
-                    ${!this._hideNotBanned ? html`
-                      <td class="td-score">
-                        ${entry.score !== null ? entry.score : '—'}
-                      </td>
-                    ` : ''}
-
+                    <td class="td-name">
+                      <a href=${this._playerHref(entry)} target="_blank">${entry.name}</a>
+                    </td>
+                    <td class="td-score">
+                      ${entry.score !== null ? entry.score : '—'}
+                    </td>
                     ${hasComputed ? html`
                       <td class="td-computed">
                         ${entry.computed_score !== null ? entry.computed_score : '?'}
