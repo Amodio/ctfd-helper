@@ -455,7 +455,7 @@ export class CtfScoreboardBox extends LitElement {
         ...(mismatchGroup.length > 0 ? [{ isHeader: true, label: '⚠️ Score mismatch' }, ...mismatchGroup] : []),
       ];
 
-      return { rows, hasComputed: true, hasBanned, monkeyMode: true };
+      return { rows, hasComputed: true, hasBanned, monkeyMode: true, bannedCount: bannedGroup.length, mismatchCount: mismatchGroup.length };
     }
 
     return { rows: allRows, hasComputed, hasBanned, monkeyMode: false };
@@ -490,7 +490,7 @@ export class CtfScoreboardBox extends LitElement {
   render() {
     // Always render — never return early — so the DOM node persists and
     // _fetched / _computedScores survive open/close cycles.
-    const { rows, hasComputed, hasBanned, monkeyMode } = this._buildRows();
+    const { rows, hasComputed, hasBanned, monkeyMode, bannedCount = 0, mismatchCount = 0 } = this._buildRows();
     const colCount = monkeyMode ? 6 : (4 + (hasComputed ? 2 : 0));
 
     const sbMins = this._minutesAgo(this._scoreboardFetchedAt);
@@ -522,6 +522,15 @@ export class CtfScoreboardBox extends LitElement {
             </span>
           ` : html`<span class="ts-never">Scoreboard not yet fetched</span>`}
         </div>
+
+        ${monkeyMode ? html`
+          <div class="status-bar" style="margin-top:0.1em;">
+            ${bannedCount   > 0 ? html`<span style="color:#ffb0b8;">🚫 <b>${bannedCount}</b> banned</span>`          : ''}
+            ${mismatchCount > 0 ? html`<span style="color:#ffd060;">⚠️ <b>${mismatchCount}</b> score mismatch</span>` : ''}
+            ${bannedCount === 0 && mismatchCount === 0 && !this._computing
+              ? html`<span style="color:#4a8;">✓ No discrepancies detected</span>` : ''}
+          </div>
+        ` : ''}
 
         ${this._loading ? html`<div class="loading-notice">⏳ Loading scoreboard…</div>` : ''}
         ${this._error   ? html`<div class="error">${this._error}</div>`                  : ''}

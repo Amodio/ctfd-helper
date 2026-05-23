@@ -164,9 +164,12 @@ def get_challenges(ctf_id):
                 ch['attempts'] = det['attempts']
             if 'max_attempts' in det:
                 ch['max_attempts'] = det['max_attempts']
-            # The detail cache is fresher than the list cache for solve counts.
+            # Overlay fresher values from the detail cache so the list view
+            # stays in sync without requiring a full list refresh.
             if 'solves' in det:
                 ch['solves'] = det['solves']
+            if det.get('solved_by_me'):
+                ch['solved_by_me'] = True
     return jsonify(ctf_data)
 
 def fetch_challenge(url, login, password, ctf_id, ch_id, ctf_data=None):
@@ -185,6 +188,10 @@ def fetch_challenge(url, login, password, ctf_id, ch_id, ctf_data=None):
             if not ch_full:
                 return None, f"CTFd API no data for challenge #{ch_id}: {r.status_code} {r.text}"
             return ch_full, None
+        elif r.status_code == 404:
+            # Challenge was deleted from CTFd — signal this explicitly so the
+            # caller can clean up the cache rather than just surfacing an error.
+            return None, 'CHALLENGE_NOT_FOUND'
         elif r.status_code == 401:
             # Try to refresh token
             token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
@@ -233,6 +240,21 @@ def get_challenge(ctf_id, chall_id):
             # Fetch and cache solves after updating challenge cache
             _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data)
         else:
+            if err_msg == 'CHALLENGE_NOT_FOUND':
+                # The challenge was deleted from CTFd.  Remove it from the list
+                # cache and the detail cache so that get_computed_scores (which
+                # iterates ctf_data['challenges']) no longer awards its points,
+                # matching CTFd's own recalculated official scores.
+                ctf_data['challenges'] = [
+                    ch for ch in ctf_data.get('challenges', [])
+                    if str(ch.get('id')) != str(chall_id)
+                ]
+                ctf_data['challenge'] = [
+                    ch for ch in ctf_data.get('challenge', [])
+                    if str(ch.get('id')) != str(chall_id)
+                ]
+                update_ctf_cache(ctf_id, ctf_data)
+                print(f"[DBG] Challenge #{chall_id} removed from CTF #{ctf_id} cache (deleted on CTFd)")
             return jsonify({'error': err_msg}), 404
     # Extract hints from the challenge details (do not fetch from /hints endpoint)
     # XXX: That may cause a problem if the challenge's hints get rewritten
@@ -645,9 +667,10 @@ def _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data=None):
             summary_solves = int(challenge_summary['solves'])
         except Exception:
             pass
-    # The detail cache (ctf_data['challenge']) is populated by get_challenge and is
-    # fresher than the list cache (ctf_data['challenges']).  Take the max of both so
-    # a single new solve is never silently skipped (e.g. list says 475, detail says 476).
+    cached_solves = solves.get(cache_key, [])
+    # The detail cache (ctf_data['challenge']) is populated by get_challenge and
+    # may be fresher than the list cache.  Take the max of both so a single new
+    # solve is never silently skipped by the early-return guard.
     for det in ctf_data.get('challenge', []):
         if str(det.get('id')) == cache_key:
             try:
@@ -657,8 +680,7 @@ def _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data=None):
             except Exception:
                 pass
             break
-    cached_solves = solves.get(cache_key, [])
-    # Only fetch when the cached list length does not match the expected count.
+    # Only skip the remote fetch when the cached list already has the right count.
     if summary_solves is not None and len(cached_solves) == summary_solves:
         return cached_solves, None
     token = ctf_data.get('token')
@@ -669,22 +691,32 @@ def _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data=None):
     headers = {'Cookie': f"session={token}"}
     print(f"[DBG] Fetching solves for challenge #{chall_id} in CTF @ {url}")
     try:
-        api_url = f"{url}/api/v1/challenges/{chall_id}/solves"
-        r = requests.get(api_url, headers=headers, timeout=60)
-        if not r.ok:
-            # Try to refresh token if unauthorized
-            if r.status_code == 401:
-                token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
-                if not token:
-                    return None, f"Could not fetch session token: {err}"
-                headers = {'Cookie': f"session={token}"}
-                r = requests.get(api_url, headers=headers, timeout=60)
-                if not r.ok:
+        # CTFd paginates the solves endpoint (default 50 per page, oldest-first).
+        # Fetching only page 1 silently drops the most recent solvers on later
+        # pages, so we loop until there is no next page.
+        fresh_solves = []
+        page = 1
+        while True:
+            api_url = f"{url}/api/v1/challenges/{chall_id}/solves?page={page}"
+            r = requests.get(api_url, headers=headers, timeout=60)
+            if not r.ok:
+                if r.status_code == 401:
+                    token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
+                    if not token:
+                        return None, f"Could not fetch session token: {err}"
+                    headers = {'Cookie': f"session={token}"}
+                    r = requests.get(api_url, headers=headers, timeout=60)
+                    if not r.ok:
+                        return None, f"CTFd API error: {r.status_code} {r.text}"
+                else:
                     return None, f"CTFd API error: {r.status_code} {r.text}"
-            else:
-                return None, f"CTFd API error: {r.status_code} {r.text}"
-        data = r.json()
-        fresh_solves = data.get('data', [])
+            data       = r.json()
+            page_data  = data.get('data', [])
+            fresh_solves.extend(page_data)
+            next_page  = data.get('meta', {}).get('pagination', {}).get('next')
+            if not page_data or not next_page:
+                break
+            page = next_page
         fresh_ids = {str(s.get('account_id')) for s in fresh_solves}
 
         # Maintain ghost_solves: solvers absent from fresh CTFd data (likely banned).
@@ -710,9 +742,8 @@ def _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data=None):
         ctf_data['solves'][cache_key]       = fresh_solves
         ctf_data['ghost_solves'][cache_key] = existing_ghost
 
-        # Propagate the authoritative solve count back into both the list cache
-        # and the detail cache so every subsequent read (page reload, list view,
-        # popup reopen) reflects the freshly fetched number.
+        # Propagate the authoritative solve count back into both caches so
+        # page reloads and the list view serve the correct number immediately.
         fresh_count = len(fresh_solves)
         for ch in ctf_data.get('challenges', []):
             if str(ch.get('id')) == cache_key:
