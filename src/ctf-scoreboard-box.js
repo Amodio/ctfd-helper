@@ -232,6 +232,25 @@ export class CtfScoreboardBox extends LitElement {
     // On first open: compute scores (scoreboard already fetched eagerly above).
     if (changedProps.has('open') && this.open) {
       if (!this._fetched)        this._fetchScoreboard();   // fallback if ctfId was already set
+
+      // Sync from the module cache in case another instance (e.g. the normal
+      // challenges view vs the "view as player" view) refreshed after this
+      // instance last fetched.  Compare fetchedAt timestamps so we never
+      // downgrade to older data.
+      const cached = _cache[this.ctfId];
+      if (cached) {
+        if (!this._scoreboardFetchedAt || cached.fetchedAt > this._scoreboardFetchedAt) {
+          this._scoreboard          = cached.scoreboard;
+          this._scoreboardFetchedAt = cached.fetchedAt;
+          this._fetched             = true;
+        }
+        if (cached.computedScores && (!this._scoresComputed || cached.computedAt > (this._computedAt ?? 0))) {
+          this._computedScores = cached.computedScores;
+          this._computedAt     = cached.computedAt;
+          this._scoresComputed = true;
+        }
+      }
+
       if (!this._scoresComputed) this._computeScores();
     }
   }
@@ -318,6 +337,15 @@ export class CtfScoreboardBox extends LitElement {
       }
       this._computedScores = merged;
       this._scoresComputed = true;
+      this._computedAt     = Date.now();
+      // Share with the module cache so other instances (normal view ↔ player
+      // view) read the same computed scores instead of independently deriving
+      // potentially different results based on whichever solve data the server
+      // happened to have cached at each call time.
+      if (_cache[this.ctfId]) {
+        _cache[this.ctfId].computedScores = this._computedScores;
+        _cache[this.ctfId].computedAt     = this._computedAt;
+      }
     } catch (e) {
       console.error('[ctf-scoreboard-box] _computeScores failed:', e);
     } finally {
@@ -330,7 +358,12 @@ export class CtfScoreboardBox extends LitElement {
     // Clear both cache layers so _fetchScoreboard goes to the server.
     delete _cache[this.ctfId];
     try { sessionStorage.removeItem(`scoreboard_${this.ctfId}`); } catch {}
+    // Also reset computed scores so _computeScores re-runs with fresh data.
+    this._scoresComputed = false;
+    this._computedScores = {};
+    this._computedAt     = null;
     await this._fetchScoreboard();
+    await this._computeScores();
   }
 
   // ── rows ──────────────────────────────────────────────────────────────────
@@ -450,7 +483,7 @@ export class CtfScoreboardBox extends LitElement {
         <div class="status-bar">
           ${this._scoreboardFetchedAt ? html`
             <span class="${sbMins < 5 ? 'ts-fresh' : 'ts-stale'}">
-              Scoreboard fetched: ${this._fmtTime(this._scoreboardFetchedAt)} (${sbMins}m ago)
+              Last updated: ${this._fmtTime(this._scoreboardFetchedAt)} (${sbMins}m ago)
             </span>
           ` : html`<span class="ts-never">Scoreboard not yet fetched</span>`}
         </div>
