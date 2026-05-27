@@ -585,7 +585,7 @@ export class CtfChallenge extends LitElement {
   set challenge(val) {
     const old = this._challenge;
     if (val && old && val.id === old.id) {
-      const richFields = ['description', 'files', 'hints', 'connection_info', 'flags'];
+      const richFields = ['description', 'files', 'hints', 'connection_info', 'flags', 'attribution'];
       const merged = { ...val };
       for (const f of richFields) {
         if (old[f] !== undefined && (val[f] === undefined || val[f] === null || (Array.isArray(val[f]) && val[f].length === 0 && Array.isArray(old[f]) && old[f].length > 0))) {
@@ -758,7 +758,7 @@ export class CtfChallenge extends LitElement {
         <h2 class="challenge-header">
           <span class="challenge-title">
             ${ch.name || ch.title || 'Unnamed Challenge'}
-            ${ch.attribution ? html`<span class="challenge-attribution">by <b>${ch.attribution}</b></span>` : ''}
+            ${ch.attribution ? html`<span class="challenge-attribution"><b>${ch.attribution}</b></span>` : ''}
           </span>
           <button title="Magic" @click=${() => { this.showMagic = true; }} class="magic-btn">🪄</button>
           <button class="refresh-btn" style="margin-left:0.5em;" title="Refresh this challenge" @click=${() => this.fetchChallenge(true)}>🔄</button>
