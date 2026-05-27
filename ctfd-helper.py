@@ -95,28 +95,48 @@ def fetch_challenge_list(url, login, password, ctf_data=None, ctf_id=None):
         token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
         if not token:
             return None, f"Could not fetch session token: {err}"
-    headers = {'Cookie': f"session={token}"}
+
+    def _do_fetch(tok):
+        hdrs = {'Cookie': f"session={tok}"}
+        return requests.get(f"{url}/api/v1/challenges", headers=hdrs, timeout=60)
+
     try:
-        r = requests.get(f"{url}/api/v1/challenges", headers=headers, timeout=60)
-        if not r.ok:
-            # Try to refresh token if unauthorized
-            if r.status_code == 401:
-                token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
-                if not token:
-                    return None, f"Could not fetch session token: {err}"
-                headers = {'Cookie': f"session={token}"}
-                r = requests.get(f"{url}/api/v1/challenges", headers=headers, timeout=60)
-                if not r.ok:
-                    return None, f"CTFd API error: {r.status_code} {r.text}"
-            else:
-                return None, f"CTFd API error: {r.status_code} {r.text}"
+        r = _do_fetch(token)
+
+        # Determine whether we need to re-authenticate:
+        #   - explicit 401 or 403 from CTFd
+        #   - a 200 that is actually an HTML login redirect (expired session)
+        needs_reauth = not r.ok and r.status_code in (401, 403)
+        if not needs_reauth and r.ok:
+            try:
+                r.json()  # probe — raises ValueError if HTML was returned
+            except ValueError:
+                needs_reauth = True
+                print(f"[DBG] Non-JSON response from CTFd (likely expired session), re-authenticating")
+
+        if needs_reauth:
+            # Evict the stale token so fetch_session_token fetches a fresh one
+            if ctf_data:
+                ctf_data.pop('token', None)
+            token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
+            if not token:
+                return None, f"Could not fetch session token: {err}"
+            r = _do_fetch(token)
+            if not r.ok:
+                return None, f"CTFd API error after re-auth: {r.status_code} {r.text}"
+        elif not r.ok:
+            return None, f"CTFd API error: {r.status_code} {r.text}"
+
         api_data = r.json()
         challenges = api_data.get('data', [])
+        if challenges is None:
+            return None, f"Unexpected CTFd response (data=null) for CTF @ {url}."
+        # An empty list is valid (CTF not started yet) — don't treat it as an error
         if not challenges:
-            return None, f"Error: no challenges found for CTF @ {url}."
+            print(f"[DBG] CTFd returned 0 challenges for CTF @ {url} (CTF may not have started yet)")
+        return challenges, None
     except Exception as e:
         return None, f"Error fetching challenges from CTF @ {url}: {e}"
-    return challenges, None
 
 @app.route('/challenges/<int:ctf_id>', methods=['GET'])
 def get_challenges(ctf_id):
