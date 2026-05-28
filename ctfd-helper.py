@@ -790,10 +790,13 @@ def get_challenge_solves(ctf_id, chall_id):
 
 @app.route('/scoreboard/<int:ctf_id>', methods=['GET'])
 def get_scoreboard(ctf_id):
-    """Proxy the CTFd scoreboard API for a given CTF."""
+    """Return the cached scoreboard. Only fetches from CTFd when ?refresh=1 or no data cached."""
     ctf_data = load_ctf_cache(ctf_id)
     if ctf_data is None:
         return jsonify({'error': f"CTF #{ctf_id} not found"}), 404
+    force_refresh = request.args.get('refresh') == '1'
+    if not force_refresh and ctf_data.get('scoreboard'):
+        return jsonify(ctf_data['scoreboard'])
     url      = ctf_data.get('url')
     login    = ctf_data.get('login')
     password = ctf_data.get('password')
@@ -816,7 +819,10 @@ def get_scoreboard(ctf_id):
             r = requests.get(f"{url}/api/v1/scoreboard", headers=headers, timeout=30)
         if not r.ok:
             return jsonify({'error': f"CTFd API error: {r.status_code} {r.text}"}), 502
-        return jsonify(r.json())
+        result = r.json()
+        ctf_data['scoreboard'] = result
+        update_ctf_cache(ctf_id, ctf_data)
+        return jsonify(result)
     except Exception as e:
         return jsonify({'error': f"Exception fetching scoreboard: {e}"}), 500
 

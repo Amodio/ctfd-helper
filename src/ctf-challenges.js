@@ -550,8 +550,9 @@ export class CtfChallenges extends LitElement {
       if (!scoreboard || !this.ctfId) return;
       const map = {};
       for (const entry of scoreboard) {
-        if (entry.name)       map[entry.name]                  = entry.pos;
-        if (entry.account_id) map[String(entry.account_id)]    = entry.pos;
+        const rank = entry.pos_full ?? entry.pos;
+        if (entry.name)       map[entry.name]               = rank;
+        if (entry.account_id) map[String(entry.account_id)] = rank;
       }
       _rankCache[this.ctfId] = map;
       this.requestUpdate();
@@ -711,7 +712,7 @@ export class CtfChallenges extends LitElement {
                     </td>
                   </tr>
                   ${visibleChs.map(ch => {
-                    const isLocked = !this.hasUserName && typeof ch.max_attempts === 'number' && ch.max_attempts > 0 && typeof ch.attempts === 'number' && ch.attempts >= ch.max_attempts && ch.solved_by_me !== true;
+                    const isLocked = typeof ch.max_attempts === 'number' && ch.max_attempts > 0 && typeof ch.attempts === 'number' && ch.attempts >= ch.max_attempts && ch.solved_by_me !== true;
                     let baseBg = '#222';
                     let baseColor = '#e0ffe0';
                     let hoverBg = '#295c29';

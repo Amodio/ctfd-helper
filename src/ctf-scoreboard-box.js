@@ -1,8 +1,5 @@
 import { LitElement, html, css } from 'lit';
 
-// Module-level cache: survives ctf-scoreboard-box destruction/recreation.
-// ctfId -> { scoreboard: [...], fetchedAt: Date }
-const _cache = {};
 
 export class CtfScoreboardBox extends LitElement {
   static properties = {
@@ -216,8 +213,6 @@ export class CtfScoreboardBox extends LitElement {
       else           this.removeAttribute('open');
     }
 
-    // When CTF changes, wipe cached state and immediately fetch the scoreboard
-    // so the rank chip in ctf-challenges is populated without needing to open the panel.
     if (changedProps.has('ctfId') && this.ctfId !== changedProps.get('ctfId')) {
       this._fetched             = false;
       this._scoresComputed      = false;
@@ -225,88 +220,36 @@ export class CtfScoreboardBox extends LitElement {
       this._computedScores      = {};
       this._scoreboardFetchedAt = null;
       this._error               = '';
+      // Populate rank chip immediately. _fetchScoreboard uses the module-level
+      // cache so this only hits the network on the very first call per session.
       this._fetchScoreboard();
     }
 
-    // On first open: compute scores (scoreboard already fetched eagerly above).
+    // On first open: fetch if no data yet, then compute scores.
     if (changedProps.has('open') && this.open) {
       this._hideNotBanned = false;   // never remember monkey state across opens
-      if (!this._fetched)        this._fetchScoreboard();   // fallback if ctfId was already set
-
-      // Sync from the module cache in case another instance (e.g. the normal
-      // challenges view vs the "view as player" view) refreshed after this
-      // instance last fetched.  Compare fetchedAt timestamps so we never
-      // downgrade to older data.
-      const cached = _cache[this.ctfId];
-      if (cached) {
-        if (!this._scoreboardFetchedAt || cached.fetchedAt > this._scoreboardFetchedAt) {
-          this._scoreboard          = cached.scoreboard;
-          this._scoreboardFetchedAt = cached.fetchedAt;
-          this._fetched             = true;
-        }
-        if (cached.computedScores && (!this._scoresComputed || cached.computedAt > (this._computedAt ?? 0))) {
-          this._computedScores = cached.computedScores;
-          this._computedAt     = cached.computedAt;
-          this._scoresComputed = true;
-        }
-      }
-
+      if (!this._fetched) this._fetchScoreboard();
       if (!this._scoresComputed) this._computeScores();
     }
   }
 
   // ── data ──────────────────────────────────────────────────────────────────
 
-  async _fetchScoreboard() {
+  async _fetchScoreboard(force = false) {
     if (!this.ctfId) return;
+    if (!force && this._scoreboard.length > 0) return;
 
-    // 1. In-memory cache (survives component recreation within the same JS context)
-    if (_cache[this.ctfId]) {
-      this._scoreboard          = _cache[this.ctfId].scoreboard;
-      this._fetched             = true;
-      this._scoreboardFetchedAt = _cache[this.ctfId].fetchedAt;
-      this.dispatchEvent(new CustomEvent('scoreboard-updated', {
-        detail: { scoreboard: this._scoreboard },
-        bubbles: true, composed: true,
-      }));
-      return;
-    }
-
-    // 2. sessionStorage cache (survives page reloads within the browser tab session)
-    try {
-      const stored = sessionStorage.getItem(`scoreboard_${this.ctfId}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        _cache[this.ctfId] = { scoreboard: parsed.scoreboard, fetchedAt: new Date(parsed.fetchedAt) };
-        this._scoreboard          = _cache[this.ctfId].scoreboard;
-        this._fetched             = true;
-        this._scoreboardFetchedAt = _cache[this.ctfId].fetchedAt;
-        this.dispatchEvent(new CustomEvent('scoreboard-updated', {
-          detail: { scoreboard: this._scoreboard },
-          bubbles: true, composed: true,
-        }));
-        return;
-      }
-    } catch {}
-
-    // 3. Network fetch — only when both caches miss
     this._loading = true;
     this._error   = '';
     try {
-      const resp = await fetch(`/scoreboard/${this.ctfId}`);
+      const url  = `/scoreboard/${this.ctfId}${force ? '?refresh=1' : ''}`;
+      const resp = await fetch(url);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       if (data.error) throw new Error(data.error);
       this._scoreboard          = Array.isArray(data.data) ? data.data : [];
       this._fetched             = true;
       this._scoreboardFetchedAt = new Date();
-      _cache[this.ctfId] = { scoreboard: this._scoreboard, fetchedAt: this._scoreboardFetchedAt };
-      try {
-        sessionStorage.setItem(`scoreboard_${this.ctfId}`, JSON.stringify({
-          scoreboard: this._scoreboard,
-          fetchedAt:  this._scoreboardFetchedAt.toISOString(),
-        }));
-      } catch {}
       this.dispatchEvent(new CustomEvent('scoreboard-updated', {
         detail: { scoreboard: this._scoreboard },
         bubbles: true, composed: true,
@@ -338,14 +281,16 @@ export class CtfScoreboardBox extends LitElement {
       this._computedScores = merged;
       this._scoresComputed = true;
       this._computedAt     = Date.now();
-      // Share with the module cache so other instances (normal view ↔ player
-      // view) read the same computed scores instead of independently deriving
-      // potentially different results based on whichever solve data the server
-      // happened to have cached at each call time.
-      if (_cache[this.ctfId]) {
-        _cache[this.ctfId].computedScores = this._computedScores;
-        _cache[this.ctfId].computedAt     = this._computedAt;
-      }
+      // Re-dispatch scoreboard-updated with pos_full so banned players get a
+      // rank in ctf-challenges even though they don't appear in the raw CTFd list.
+      const { rows } = this._buildRows();
+      const fullScoreboard = rows
+        .filter(r => !r.isHeader)
+        .map(r => ({ name: r.name, account_id: r.account_id, pos_full: r.pos_full ?? r.pos_clean }));
+      this.dispatchEvent(new CustomEvent('scoreboard-updated', {
+        detail: { scoreboard: fullScoreboard },
+        bubbles: true, composed: true,
+      }));
     } catch (e) {
       console.error('[ctf-scoreboard-box] _computeScores failed:', e);
     } finally {
@@ -355,14 +300,10 @@ export class CtfScoreboardBox extends LitElement {
   }
 
   async _refresh() {
-    // Clear both cache layers so _fetchScoreboard goes to the server.
-    delete _cache[this.ctfId];
-    try { sessionStorage.removeItem(`scoreboard_${this.ctfId}`); } catch {}
-    // Also reset computed scores so _computeScores re-runs with fresh data.
     this._scoresComputed = false;
     this._computedScores = {};
     this._computedAt     = null;
-    await this._fetchScoreboard();
+    await this._fetchScoreboard(true);
     await this._computeScores();
   }
 
