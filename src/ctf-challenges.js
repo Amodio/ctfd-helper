@@ -711,7 +711,7 @@ export class CtfChallenges extends LitElement {
                     </td>
                   </tr>
                   ${visibleChs.map(ch => {
-                    const isLocked = typeof ch.max_attempts === 'number' && ch.max_attempts > 0 && typeof ch.attempts === 'number' && ch.attempts >= ch.max_attempts && ch.solved_by_me !== true;
+                    const isLocked = !this.hasUserName && typeof ch.max_attempts === 'number' && ch.max_attempts > 0 && typeof ch.attempts === 'number' && ch.attempts >= ch.max_attempts && ch.solved_by_me !== true;
                     let baseBg = '#222';
                     let baseColor = '#e0ffe0';
                     let hoverBg = '#295c29';
