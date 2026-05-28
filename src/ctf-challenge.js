@@ -518,28 +518,36 @@ export class CtfChallenge extends LitElement {
         return;
       }
       if (result.data && result.data.data && Array.isArray(result.data.data) && result.data.data[0] && result.data.data[0].status) {
-        if (result.data.data[0].status === 'correct') {
-          this.flags[idx].state = 'valid';
-          this.challenge = { ...ch, solved_by_me: true };
+        const status = result.data.data[0].status;
+        if (status === 'correct') {
+          // Fetch fresh challenge data from server to update solves count
+          await this.fetchChallenge(true);
+          this.challenge = { ...this.challenge, solved_by_me: true };
+          // Re-find the flag by id since fetchChallenge replaces this.flags
+          const fi = this.flags.findIndex(f => f.id === flagId);
+          if (fi !== -1) this.flags[fi].state = 'valid';
           this.dispatchEvent(new CustomEvent('challenge-solved', {
             bubbles: true, composed: true,
             detail: { challengeId: ch.id }
           }));
-        } else if (result.data.data[0].status === 'incorrect') {
-          this.flags[idx].state = 'invalid';
+        } else if (status === 'incorrect') {
+          // Fetch fresh challenge data from server to update attempts count
+          await this.fetchChallenge(true);
+          // Re-find the flag by id since fetchChallenge replaces this.flags
+          const fi = this.flags.findIndex(f => f.id === flagId);
+          if (fi !== -1) this.flags[fi].state = 'invalid';
         } else {
           this.error_str = 'Flag test failed: Unknown status from server.';
         }
       } else {
         this.error_str = 'Flag test failed: Malformed response from server.';
       }
-      if (this.flags[idx].state === 'valid' || this.flags[idx].state === 'invalid') {
+      const updatedIdx = this.flags.findIndex(f => f.id === flagId);
+      if (updatedIdx !== -1 && (this.flags[updatedIdx].state === 'valid' || this.flags[updatedIdx].state === 'invalid')) {
         this.error_str = '';
         this._dispatchFlagsChanged();
-        this.requestUpdate();
-      } else {
-        this.requestUpdate();
       }
+      this.requestUpdate();
     } catch (e) {
       this.error_str = `Flag test failed: ${e.message || e}`;
     }
