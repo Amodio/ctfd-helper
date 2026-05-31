@@ -19,6 +19,9 @@ export class CtfScoreboardBox extends LitElement {
 
   static styles = css`
     :host {
+      display: contents;
+    }
+    .backdrop {
       position: fixed;
       inset: 0;
       /* invisible when closed — pointer-events off so it doesn't block the page */
@@ -30,7 +33,7 @@ export class CtfScoreboardBox extends LitElement {
       pointer-events: none;
       transition: background 0.15s;
     }
-    :host([open]) {
+    :host([open]) .backdrop {
       background: rgba(0,0,0,0.55);
       pointer-events: auto;
     }
@@ -455,6 +458,10 @@ export class CtfScoreboardBox extends LitElement {
     const sbMins = this._minutesAgo(this._scoreboardFetchedAt);
 
     return html`
+      <div class="backdrop"
+        @mousedown=${e => { this._backdropMousedown = e.target === e.currentTarget; }}
+        @click=${e => { if (this.open && e.target === e.currentTarget && this._backdropMousedown) this._close(); }}
+      >
       <div class="box">
         <!-- header -->
         <div class="header-row">
@@ -615,6 +622,7 @@ export class CtfScoreboardBox extends LitElement {
             </tbody>
           </table>
         ` : ''}
+      </div>
       </div>
     `;
   }
