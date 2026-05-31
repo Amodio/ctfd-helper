@@ -1,9 +1,9 @@
 import { LitElement, html, css } from 'lit';
 
-
 export class CtfScoreboardBox extends LitElement {
   static properties = {
     ctfId:               { type: Number },
+    ctfUrl:              { type: String },
     open:                { type: Boolean },
     // internal reactive state
     _scoreboard:         { state: true },   // raw API array
@@ -194,6 +194,7 @@ export class CtfScoreboardBox extends LitElement {
   constructor() {
     super();
     this.ctfId                = null;
+    this.ctfUrl               = '';
     this.open                 = false;
     this._scoreboard          = [];
     this._computedScores      = {};
@@ -214,56 +215,73 @@ export class CtfScoreboardBox extends LitElement {
     }
 
     if (changedProps.has('ctfId') && this.ctfId !== changedProps.get('ctfId')) {
-      this._fetched             = false;
-      this._scoresComputed      = false;
-      this._scoreboard          = [];
-      this._computedScores      = {};
+      this._error             = '';
+      this._fetched           = false;
+      this._scoresComputed    = false;
+      this._scoreboard        = [];
+      this._computedScores    = {};
       this._scoreboardFetchedAt = null;
-      this._error               = '';
-      // Populate rank chip immediately. _fetchScoreboard uses the module-level
-      // cache so this only hits the network on the very first call per session.
-      this._fetchScoreboard();
     }
 
-    // On first open: fetch if no data yet, then compute scores.
-    if (changedProps.has('open') && this.open) {
-      this._hideNotBanned = false;   // never remember monkey state across opens
-      if (!this._fetched) this._fetchScoreboard();
-      if (!this._scoresComputed) this._computeScores();
-    }
+    // NO reactive fetch trigger here.
+    // The only things that may call _fetchScoreboard / _computeScores are:
+    //   • the 🏆 button click in ctf-challenges (handled directly in the click handler)
+    //   • _refresh() — the re-fetch button inside this component
+    // loadChallenges() never touches the scoreboard box so no state mutation
+    // can ever trigger a spurious update.
   }
 
   // ── data ──────────────────────────────────────────────────────────────────
 
-  async _fetchScoreboard(force = false) {
+  async _fetchScoreboard(force = false, signal = null) {
     if (!this.ctfId) return;
-    if (!force && this._scoreboard.length > 0) return;
+    if (!force && (this._fetched || this._loading)) return;
 
     this._loading = true;
     this._error   = '';
     try {
-      const url  = `/scoreboard/${this.ctfId}${force ? '?refresh=1' : ''}`;
-      const resp = await fetch(url);
+      const url = `/scoreboard/${this.ctfId}${force ? '?refresh=1' : ''}`;
+      console.log(`[DBG] Fetching scoreboard for CTF @ ${this.ctfUrl || this.ctfId}`);
+      const resp = await fetch(url, signal ? { signal } : {});
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       if (data.error) throw new Error(data.error);
       this._scoreboard          = Array.isArray(data.data) ? data.data : [];
       this._fetched             = true;
-      this._scoreboardFetchedAt = new Date();
+      // Use the timestamp persisted in the JSON file so that serving from cache
+      // (e.g. after a challenge-list refresh) returns the exact same value and
+      // never causes "Last updated" to change unexpectedly.
+      this._scoreboardFetchedAt = data.last_updated ? new Date(data.last_updated) : new Date();
       this.dispatchEvent(new CustomEvent('scoreboard-updated', {
         detail: { scoreboard: this._scoreboard },
         bubbles: true, composed: true,
       }));
     } catch (e) {
-      this._error = `Failed to load scoreboard: ${e.message}`;
+      if (e.name === 'AbortError') {
+        // Cancelled intentionally (force-refresh started) — not an error.
+      } else {
+        this._error = `Failed to load scoreboard: ${e.message}`;
+      }
     } finally {
       this._loading = false;
     }
   }
 
+  /**
+   * Called once by ctf-challenges after the initial loadChallenges() completes.
+   * Pre-populates the rank chip for all players (including banned ones) without
+   * waiting for the user to open the scoreboard.
+   * Safe to call multiple times — the _fetched / _loading guards prevent double-fetch.
+   */
+  async initFetch(signal) {
+    if (this._fetched || this._loading || !this.ctfId) return;
+    await this._fetchScoreboard(false, signal);
+    await this._computeScores();
+  }
+
   /** Single request to the server, which aggregates all challenge solves server-side. */
   async _computeScores() {
-    if (!this.ctfId) return;
+    if (!this.ctfId || this._computing) return;
     this._computing = true;
     try {
       const resp = await fetch(`/computed_scores/${this.ctfId}`);

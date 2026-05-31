@@ -3,7 +3,7 @@
 import os
 from flask import Flask, jsonify, request, send_from_directory
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import requests
 import webbrowser
 import sys
@@ -820,9 +820,13 @@ def get_scoreboard(ctf_id):
         if not r.ok:
             return jsonify({'error': f"CTFd API error: {r.status_code} {r.text}"}), 502
         result = r.json()
-        ctf_data['scoreboard'] = result
+        # Strip the useless 'success' key before persisting, and record when
+        # this fetch happened so the frontend can display a stable timestamp.
+        stored = {k: v for k, v in result.items() if k != 'success'}
+        stored['last_updated'] = datetime.now(timezone.utc).isoformat()
+        ctf_data['scoreboard'] = stored
         update_ctf_cache(ctf_id, ctf_data)
-        return jsonify(result)
+        return jsonify(stored)
     except Exception as e:
         return jsonify({'error': f"Exception fetching scoreboard: {e}"}), 500
 

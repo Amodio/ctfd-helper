@@ -438,13 +438,11 @@ export class CtfChallenges extends LitElement {
         }
       }
 
-      // After a full challenge refresh, mark scoreboard computed scores as stale
-      // so the next open re-fetches from /computed_scores.
-      // Do NOT wipe _computedScores: the merge in _computeScores() preserves
-      // players who were banned and therefore removed from CTFd's solve lists.
-      if (forceRefresh) {
-        const scoreboardEl = this.shadowRoot?.querySelector('ctf-scoreboard-box');
-        if (scoreboardEl) scoreboardEl._scoresComputed = false;
+      // On initial load, kick off the passive scoreboard fetch so the rank chip
+      // is populated without the user having to open 🏆.
+      // On force refresh we never touch the scoreboard box.
+      if (!forceRefresh) {
+        this.shadowRoot?.querySelector('ctf-scoreboard-box')?.initFetch();
       }
 
     } catch (e) {
@@ -656,7 +654,17 @@ export class CtfChallenges extends LitElement {
               title="Scoreboard"
               class="refresh-all-btn"
               style="font-size:1.6em;background:transparent;border:none;cursor:pointer;padding:0.1em;"
-              @click=${() => { this.showScoreboard = true; this.requestUpdate(); }}
+              @click=${async () => {
+                this.showScoreboard = true;
+                this.requestUpdate();
+                const sb = this.shadowRoot?.querySelector('ctf-scoreboard-box');
+                if (!sb) return;
+                // Fetch raw scoreboard if we don't have it yet.
+                if (!sb._fetched && !sb._loading) await sb._fetchScoreboard();
+                // Always recompute on open so ranks are fresh after a challenge refresh.
+                // _computeScores() is a no-op when already computing.
+                await sb._computeScores();
+              }}
             >🏆</button>
           </div>
           <div class="toolbar-center">
@@ -806,6 +814,7 @@ export class CtfChallenges extends LitElement {
 
         <ctf-scoreboard-box
           .ctfId=${this.ctfId}
+          .ctfUrl=${this.ctfUrl || ''}
           .open=${this.showScoreboard}
           @close-scoreboard=${() => { this.showScoreboard = false; this.requestUpdate(); }}
         ></ctf-scoreboard-box>
