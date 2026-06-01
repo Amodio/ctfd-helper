@@ -443,8 +443,7 @@ export class CtfScoreboardBox extends LitElement {
   }
 
   _playerHref(entry) {
-    return '/?user_id='  + encodeURIComponent(entry.account_id)
-         + '&username=' + encodeURIComponent(entry.name ?? '');
+    return '/?user_id=' + encodeURIComponent(entry.account_id);
   }
 
   // ── render ────────────────────────────────────────────────────────────────

@@ -312,14 +312,15 @@ export class CtfChallenges extends LitElement {
     super.connectedCallback();
     const params = new URLSearchParams(window.location.search);
     const userId = params.get('user_id');
-    const hasUserName = params.get('username');
-    const userName = hasUserName || this.login;
     const ctfId = localStorage.getItem('last-opened-ctf');
     if (ctfId) {
       this.ctfId = Number(ctfId);
-      this.userId = Number(userId);
-      this.userName = userName || `User #${userId}`;
-      this.hasUserName = hasUserName;
+      this.userId = userId ? Number(userId) : null;
+      // User-view mode whenever a user_id is present in the URL.
+      // The display name is a placeholder until the scoreboard fires
+      // 'scoreboard-updated' and we can resolve the real name by account_id.
+      this.hasUserName = !!userId;
+      this.userName = this.hasUserName ? `User #${this.userId}` : (this.login || '');
       await this.loadChallenges();
     } else {
       console.warn('[CtfChallengesAsUser] Missing ctfId or userId', { ctfId, userId });
@@ -568,6 +569,16 @@ export class CtfChallenges extends LitElement {
       }
       _rankCache[this.ctfId] = map;
       _idCache[this.ctfId]   = ids;
+      // In user-view mode the name was not passed through the URL — resolve it
+      // from the scoreboard now that we have the full list keyed by account_id.
+      if (this.hasUserName && this.userId) {
+        for (const entry of scoreboard) {
+          if (entry.account_id && Number(entry.account_id) === this.userId) {
+            this.userName = entry.name;
+            break;
+          }
+        }
+      }
       this.requestUpdate();
     });
   }
