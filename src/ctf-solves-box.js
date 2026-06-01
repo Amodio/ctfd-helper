@@ -12,6 +12,9 @@ export class CtfSolvesBox extends LitElement {
 
   static styles = css`
     :host {
+      display: contents;
+    }
+    .backdrop {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0,0,0,0.45);
@@ -143,6 +146,10 @@ export class CtfSolvesBox extends LitElement {
   render() {
     if (!this.open) return html``;
     return html`
+      <div class="backdrop"
+        @mousedown=${e => { this._backdropMousedown = e.target === e.currentTarget; }}
+        @click=${e => { if (e.target === e.currentTarget && this._backdropMousedown) this.close(); }}
+      >
       <div class="box">
         <button class="close-btn" @click=${() => this.close()}>&times;</button>
         <h3>Solves</h3>
@@ -161,6 +168,7 @@ export class CtfSolvesBox extends LitElement {
             </li>
           `)}
         </ul>
+      </div>
       </div>
     `;
   }
