@@ -2,11 +2,15 @@ import { LitElement, html, css } from 'lit';
 
 import './ctf-challenge.js';
 import './ctf-scoreboard-box.js';
+import './ctf-player-box.js';
 
 // Module-level rank cache: ctfId -> { name -> pos, account_id_str -> pos }
 // Populated passively when ctf-scoreboard-box dispatches 'scoreboard-updated'.
 // Never triggers its own network request.
 const _rankCache = {};
+// Module-level id cache: ctfId -> { name -> account_id }
+// Populated from the same scoreboard event, lets normal mode also open the player box.
+const _idCache = {};
 
 export class CtfChallenges extends LitElement {
   static properties = {
@@ -19,6 +23,7 @@ export class CtfChallenges extends LitElement {
     login: { type: String },
     slowRefresh: { type: Number },
     showScoreboard: { type: Boolean },
+    _pbOpen:        { state: true },
   };
 
   static styles = css`
@@ -44,6 +49,14 @@ export class CtfChallenges extends LitElement {
       box-shadow: none;
       text-shadow: none;
     }
+    /* clickable variant – only rendered when an account_id is resolved */
+    .ctf-login[role="button"] {
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-color: #7a9e9f66;
+      text-underline-offset: 3px;
+    }
+    .ctf-login[role="button"]:hover { filter: brightness(1.25); }
     .ctf-ch-row.updating {
       animation: highlight-update 0.7s linear;
       background: #2e3cff !important;
@@ -260,6 +273,7 @@ export class CtfChallenges extends LitElement {
     this.isLoading = false;
     this.slowRefresh = 0;
     this.showScoreboard  = false;
+    this._pbOpen         = false;
     const loginLocal = localStorage.getItem('last-ctf-login');
     this._login = loginLocal || '';
   }
@@ -547,12 +561,16 @@ export class CtfChallenges extends LitElement {
       const scoreboard = e.detail?.scoreboard;
       if (!scoreboard || !this.ctfId) return;
       const map = {};
+      const ids = {};
       for (const entry of scoreboard) {
         const rank = entry.pos_full ?? entry.pos;
         if (entry.name)       map[entry.name]               = rank;
         if (entry.account_id) map[String(entry.account_id)] = rank;
+        // store name → account_id so the player box works in normal mode too
+        if (entry.name && entry.account_id) ids[entry.name] = entry.account_id;
       }
       _rankCache[this.ctfId] = map;
+      _idCache[this.ctfId]   = ids;
       this.requestUpdate();
     });
   }
@@ -632,6 +650,14 @@ export class CtfChallenges extends LitElement {
       if (ch.solved_by_me === true) solvedPoints += val;
     }
 
+    // Resolve the account_id for the player-box:
+    // • user mode  → this.userId is set directly from props
+    // • normal mode → look up the login name in the scoreboard id-cache
+    //   (populated passively once ctf-scoreboard-box fires 'scoreboard-updated')
+    const pbUserId = this.userId
+      || (_idCache[this.ctfId] && displayName && _idCache[this.ctfId][displayName])
+      || null;
+
     return html`
       <div class="challenges-wrapper">
         <div class="toolbar">
@@ -686,7 +712,13 @@ export class CtfChallenges extends LitElement {
         </div>
 
         <h2 class="stats-row">
-          ${displayName ? html`<span class="ctf-login">${displayName}</span>` : ''}
+          ${displayName ? html`
+            <span
+              class="ctf-login"
+              role=${pbUserId ? 'button' : 'text'}
+              @click=${pbUserId ? () => { this._pbOpen = true; } : null}
+            >${displayName}</span>
+          ` : ''}
           ${cleanRank !== null ? html`<span class="rank-chip">#${cleanRank}</span>` : ''}
           <span class="stats-pct">
             ${solved}/${total} solved (${total > 0 ? Math.round((solved/total)*100) : 0}%)
@@ -818,6 +850,14 @@ export class CtfChallenges extends LitElement {
           .open=${this.showScoreboard}
           @close-scoreboard=${() => { this.showScoreboard = false; this.requestUpdate(); }}
         ></ctf-scoreboard-box>
+
+        <ctf-player-box
+          .ctfId=${this.ctfId}
+          .userId=${pbUserId}
+          .userName=${displayName || `User #${pbUserId}`}
+          .open=${this._pbOpen}
+          @close-player-box=${() => { this._pbOpen = false; }}
+        ></ctf-player-box>
       </div>
     `;
   }

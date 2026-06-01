@@ -858,6 +858,95 @@ def get_computed_scores(ctf_id):
             scores[aid]['score'] += val
     return jsonify({'scores': scores})
 
+@app.route('/player/<int:ctf_id>/<int:user_id>', methods=['GET'])
+def get_player_stats(ctf_id, user_id):
+    """Return all cached solves for one player, enriched with challenge metadata.
+
+    Built entirely from the in-memory / JSON cache — never triggers a remote
+    fetch.  The caller (ctf-player-box.js) therefore gets sub-millisecond
+    responses once challenges have been refreshed at least once.
+
+    Response schema
+    ---------------
+    {
+      "user_id": 42,
+      "solve_count": 7,
+      "total_score": 1750,
+      "solves": [
+        {
+          "challenge_id": 3,
+          "name":         "Super Easy Flag",
+          "category":     "Misc",
+          "value":        100,
+          "date":         "2024-04-06T14:22:00Z",
+          "account_id":   42,
+          "account_name": "hacker42"
+        },
+        ...
+      ]
+    }
+
+    Solves are returned sorted by date ascending so the frontend can build the
+    cumulative score timeline without an extra sort.
+    """
+    ctf_data = load_ctf_cache(ctf_id)
+    if ctf_data is None:
+        return jsonify({'error': f"CTF #{ctf_id} not found"}), 404
+
+    # Build a unified challenge-metadata lookup.
+    # The detail cache ('challenge') has richer info (name, value, category);
+    # fall back to the list cache ('challenges') when a detail entry is absent.
+    ch_by_id = {}
+    for ch in (ctf_data.get('challenges') or []):
+        cid = str(ch.get('id', ''))
+        if cid:
+            ch_by_id[cid] = ch
+    for ch in (ctf_data.get('challenge') or []):
+        cid = str(ch.get('id', ''))
+        if not cid:
+            continue
+        if cid in ch_by_id:
+            # Merge: prefer non-None values from the detail entry
+            merged = dict(ch_by_id[cid])
+            for k, v in ch.items():
+                if v is not None:
+                    merged[k] = v
+            ch_by_id[cid] = merged
+        else:
+            ch_by_id[cid] = ch
+
+    solves_cache = ctf_data.get('solves', {})
+    player_solves = []
+
+    for chall_id_str, solve_list in solves_cache.items():
+        for solve in (solve_list or []):
+            if str(solve.get('account_id', '')) != str(user_id):
+                continue
+            # Found this user's solve for challenge chall_id_str
+            ch = ch_by_id.get(chall_id_str, {})
+            player_solves.append({
+                'challenge_id': int(chall_id_str) if chall_id_str.isdigit() else chall_id_str,
+                'name':         ch.get('name') or ch.get('title') or f'Challenge #{chall_id_str}',
+                'category':     ch.get('category') or 'Uncategorized',
+                'value':        ch.get('value') or 0,
+                'date':         solve.get('date') or '',
+                'account_id':   solve.get('account_id'),
+                'account_name': solve.get('name') or '',
+            })
+            break  # each challenge is solved at most once per user
+
+    # Sort ascending by date so the frontend can build a timeline left-to-right
+    player_solves.sort(key=lambda s: s.get('date') or '')
+
+    total_score = sum(int(s.get('value') or 0) for s in player_solves)
+
+    return jsonify({
+        'user_id':     user_id,
+        'solve_count': len(player_solves),
+        'total_score': total_score,
+        'solves':      player_solves,
+    })
+
 @app.route('/ctfd_title', methods=['POST'])
 def get_ctfd_title():
     """Fetch the <title> of the remote CTFd index page and return it as JSON."""
