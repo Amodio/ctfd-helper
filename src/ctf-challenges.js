@@ -52,9 +52,6 @@ export class CtfChallenges extends LitElement {
     /* clickable variant – only rendered when an account_id is resolved */
     .ctf-login[role="button"] {
       cursor: pointer;
-      text-decoration: underline;
-      text-decoration-color: #7a9e9f66;
-      text-underline-offset: 3px;
     }
     .ctf-login[role="button"]:hover { filter: brightness(1.25); }
     .ctf-ch-row.updating {
