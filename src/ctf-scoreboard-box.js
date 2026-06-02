@@ -192,6 +192,9 @@ export class CtfScoreboardBox extends LitElement {
     .mismatch-badge { background: #2e2500; color: #ffd060; cursor: help; }
 
     .empty-msg { color: #555; text-align: center; padding: 1.2em 0; }
+
+    /* last-seen timestamp shown in the score cell for banned players */
+    .td-last-seen { color: #8888aa; font-size: 0.80em; white-space: nowrap; }
   `;
 
   constructor() {
@@ -307,7 +310,14 @@ export class CtfScoreboardBox extends LitElement {
       const { rows } = this._buildRows();
       const fullScoreboard = rows
         .filter(r => !r.isHeader)
-        .map(r => ({ name: r.name, account_id: r.account_id, pos_full: r.pos_full ?? r.pos_clean }));
+        .map(r => ({
+          name:       r.name,
+          account_id: r.account_id,
+          pos_full:   r.pos_full ?? r.pos_clean,
+          pos_clean:  r.pos_clean ?? null,
+          banned:     r.banned   || false,
+          last_seen:  r.last_seen || null,
+        }));
       this.dispatchEvent(new CustomEvent('scoreboard-updated', {
         detail: { scoreboard: fullScoreboard },
         bubbles: true, composed: true,
@@ -338,7 +348,7 @@ export class CtfScoreboardBox extends LitElement {
     const bannedEntries = hasComputed
       ? Object.entries(this._computedScores)
           .filter(([aid, info]) => !scoreboardIds.has(Number(aid)) && info.score > 0)
-          .map(([aid, info])    => ({ account_id: Number(aid), name: info.name, computed_score: info.score }))
+          .map(([aid, info])    => ({ account_id: Number(aid), name: info.name, computed_score: info.score, last_seen: info.last_seen || null }))
           .sort((a, b) => b.computed_score - a.computed_score)
       : [];
 
@@ -374,6 +384,7 @@ export class CtfScoreboardBox extends LitElement {
         computed_score: b.computed_score,
         banned:         true,
         pos_full:       above + idx + 1,
+        last_seen:      b.last_seen || null,
       };
     });
 
@@ -397,6 +408,7 @@ export class CtfScoreboardBox extends LitElement {
             group:          'banned',
             listingRank:    null,
             pos_full:       above + idx + 1,
+            last_seen:      b.last_seen || null,
           };
         });
 
@@ -435,6 +447,18 @@ export class CtfScoreboardBox extends LitElement {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
          + ' '
          + date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+
+  /** Compact date+time string for table cells (e.g. "Jun 2, 14:35"). */
+  _fmtDateShort(dateStr) {
+    if (!dateStr) return '—';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+           + ' '
+           + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch { return '—'; }
   }
 
   _minutesAgo(date) {
@@ -562,7 +586,11 @@ export class CtfScoreboardBox extends LitElement {
                       <td class="td-name">
                         <a href=${this._playerHref(entry)} target="_blank">${entry.name}</a>
                       </td>
-                      <td class="td-score">${entry.score !== null ? entry.score : '—'}</td>
+                      <td class="td-score">
+                        ${entry.banned && entry.last_seen
+                          ? html`<span class="td-last-seen">${this._fmtDateShort(entry.last_seen)}</span>`
+                          : entry.score !== null ? entry.score : '—'}
+                      </td>
                       <td class="td-computed">${entry.computed_score !== null ? entry.computed_score : '?'}</td>
                       <td class="td-status">
                         ${isBanned
@@ -600,7 +628,9 @@ export class CtfScoreboardBox extends LitElement {
                       <a href=${this._playerHref(entry)} target="_blank">${entry.name}</a>
                     </td>
                     <td class="td-score">
-                      ${entry.score !== null ? entry.score : '—'}
+                      ${entry.banned && entry.last_seen
+                        ? html`<span class="td-last-seen">${this._fmtDateShort(entry.last_seen)}</span>`
+                        : entry.score !== null ? entry.score : '—'}
                     </td>
                     ${hasComputed ? html`
                       <td class="td-computed">

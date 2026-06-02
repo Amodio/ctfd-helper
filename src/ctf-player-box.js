@@ -13,13 +13,16 @@ function catColor(idx) {
 
 export class CtfPlayerBox extends LitElement {
   static properties = {
-    ctfId:    { type: Number },
-    userId:   { type: Number },
-    userName: { type: String },
-    open:     { type: Boolean, reflect: true },
-    _solves:  { state: true },
-    _loading: { state: true },
-    _error:   { state: true },
+    ctfId:      { type: Number },
+    userId:     { type: Number },
+    userName:   { type: String },
+    open:       { type: Boolean, reflect: true },
+    _solves:    { state: true },
+    _loading:   { state: true },
+    _error:     { state: true },
+    _banned:    { state: true },
+    _lastSeen:  { state: true },
+    rank:       { type: Number },
   };
 
   static styles = css`
@@ -92,7 +95,10 @@ export class CtfPlayerBox extends LitElement {
       font-family: monospace;
       white-space: nowrap;
     }
-    .chip.pts { background: #2a2510; color: #ffd700; border-color: #5a4500; }
+    .chip.pts      { background: #2a2510; color: #ffd700; border-color: #5a4500; }
+    .chip.banned   { background: #2a1020; color: #ffb0b8; border-color: #7a2040; }
+    .chip.last-seen { background: #1a1a2a; color: #8888bb; border-color: #3a3a5a; font-size:0.80em; }
+    .chip.rank      { background: #1a2a1a; color: #90ee90; border-color: #2a5a2a; }
     .close-btn {
       background: #dc3545;
       color: #fff;
@@ -244,10 +250,13 @@ export class CtfPlayerBox extends LitElement {
     this.ctfId    = null;
     this.userId   = null;
     this.userName = '';
-    this.open     = false;
-    this._solves  = [];
-    this._loading = false;
-    this._error   = '';
+    this.open      = false;
+    this._solves   = [];
+    this._loading  = false;
+    this._error    = '';
+    this._banned   = false;
+    this._lastSeen = null;
+    this.rank      = null;
   }
 
   updated(changedProps) {
@@ -272,7 +281,9 @@ export class CtfPlayerBox extends LitElement {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
       if (data.error) throw new Error(data.error);
-      this._solves = Array.isArray(data.solves) ? data.solves : [];
+      this._solves   = Array.isArray(data.solves) ? data.solves : [];
+      this._banned   = data.banned   || false;
+      this._lastSeen = data.last_seen || null;
     } catch (e) {
       this._error = `Could not load player profile: ${e.message}`;
     } finally {
@@ -517,9 +528,20 @@ export class CtfPlayerBox extends LitElement {
 
           <!-- Header -->
           <div class="header">
-            <span class="player-icon">🧑‍💻</span>
+            <span class="player-icon">${this._banned ? '🚫' : '🧑‍💻'}</span>
             <h2 class="player-name">${this.userName || `User #${this.userId}`}</h2>
             <div class="chips">
+              ${this.rank != null ? html`<span class="chip rank">#${this.rank}</span>` : ''}
+              ${this._banned ? html`
+                <span class="chip banned">BANNED</span>
+                ${this._lastSeen ? html`
+                  <span class="chip last-seen"
+                        title="Last confirmed active: ${new Date(this._lastSeen).toLocaleString()}">
+                    last seen ${new Date(this._lastSeen).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                    ${new Date(this._lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                ` : ''}
+              ` : ''}
               <span class="chip">${this._solves.length} solved</span>
               <span class="chip pts">${totalPts} pts</span>
             </div>

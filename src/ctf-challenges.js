@@ -11,6 +11,21 @@ const _rankCache = {};
 // Module-level id cache: ctfId -> { name -> account_id }
 // Populated from the same scoreboard event, lets normal mode also open the player box.
 const _idCache = {};
+// Module-level banned cache: ctfId -> { account_id_str -> { last_seen } }
+// Only contains confirmed-banned entries (ghost players detected by the scoreboard box).
+const _bannedCache = {};
+
+/** Compact date+time for inline badges (e.g. "Jun 2, 14:35"). */
+function _fmtDateShort(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+         + ' '  // narrow no-break space
+         + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
+}
 
 export class CtfChallenges extends LitElement {
   static properties = {
@@ -561,14 +576,25 @@ export class CtfChallenges extends LitElement {
       const map = {};
       const ids = {};
       for (const entry of scoreboard) {
-        const rank = entry.pos_full ?? entry.pos;
+        // Clean rank for normal players; full rank for banned players
+        const rank = entry.banned
+          ? (entry.pos_full ?? entry.pos)
+          : (entry.pos_clean ?? entry.pos ?? entry.pos_full);
         if (entry.name)       map[entry.name]               = rank;
         if (entry.account_id) map[String(entry.account_id)] = rank;
         // store name → account_id so the player box works in normal mode too
         if (entry.name && entry.account_id) ids[entry.name] = entry.account_id;
       }
-      _rankCache[this.ctfId] = map;
-      _idCache[this.ctfId]   = ids;
+      _rankCache[this.ctfId]  = map;
+      _idCache[this.ctfId]    = ids;
+      // Rebuild the banned cache from this scoreboard snapshot
+      const banned = {};
+      for (const entry of scoreboard) {
+        if (entry.banned && entry.account_id) {
+          banned[String(entry.account_id)] = { last_seen: entry.last_seen || null };
+        }
+      }
+      _bannedCache[this.ctfId] = banned;
       // In user-view mode the name was not passed through the URL — resolve it
       // from the scoreboard now that we have the full list keyed by account_id.
       if (this.hasUserName && this.userId) {
@@ -666,6 +692,14 @@ export class CtfChallenges extends LitElement {
       || (_idCache[this.ctfId] && displayName && _idCache[this.ctfId][displayName])
       || null;
 
+    // Check whether the viewed player is banned (must come after pbUserId)
+    const _bCache        = _bannedCache[this.ctfId] || {};
+    const _bannedEntry   = pbUserId ? _bCache[String(pbUserId)] : null;
+    const isBannedPlayer = !!_bannedEntry;
+    const lastSeenStr    = isBannedPlayer && _bannedEntry.last_seen
+      ? _fmtDateShort(_bannedEntry.last_seen)
+      : null;
+
     return html`
       <div class="challenges-wrapper">
         <div class="toolbar">
@@ -727,7 +761,12 @@ export class CtfChallenges extends LitElement {
               @click=${pbUserId ? () => { this._pbOpen = true; } : null}
             >${displayName}</span>
           ` : ''}
-          ${cleanRank !== null ? html`<span class="rank-chip">#${cleanRank}</span>` : ''}
+          ${isBannedPlayer
+            ? html`<span class="rank-chip"
+                         style="background:#2a1020;border-color:#7a1030;color:#ffb0b8;">
+                     🚫 BANNED${cleanRank !== null ? html` #${cleanRank}` : ''}${lastSeenStr ? html` · ${lastSeenStr}` : ''}
+                   </span>`
+            : cleanRank !== null ? html`<span class="rank-chip">#${cleanRank}</span>` : ''}
           <span class="stats-pct">
             ${solved}/${total} solved (${total > 0 ? Math.round((solved/total)*100) : 0}%)
             | ${solvedPoints}/${totalPoints} pts
@@ -863,6 +902,7 @@ export class CtfChallenges extends LitElement {
           .ctfId=${this.ctfId}
           .userId=${pbUserId}
           .userName=${displayName || `User #${pbUserId}`}
+          .rank=${cleanRank}
           .open=${this._pbOpen}
           @close-player-box=${() => { this._pbOpen = false; }}
         ></ctf-player-box>
