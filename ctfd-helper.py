@@ -751,10 +751,20 @@ def _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data=None):
         ghost_ids       = {str(s.get('account_id')) for s in existing_ghost}
 
         # Solvers in old cache but gone from CTFd → add to ghost (once only)
+        # Also update banned_players with their solve date as a last_seen candidate.
+        banned_players_map = ctf_data.setdefault('banned_players', {})
         for s in existing_cached:
             aid = str(s.get('account_id'))
             if aid not in fresh_ids and aid not in ghost_ids:
                 existing_ghost.append(s)
+                solve_date = s.get('date', '')
+                existing_bp = banned_players_map.get(aid, {})
+                existing_ls = existing_bp.get('last_seen', '')
+                candidates = [c for c in [existing_ls, solve_date] if c]
+                banned_players_map[aid] = {
+                    'name': existing_bp.get('name') or s.get('name', ''),
+                    'last_seen': max(candidates) if candidates else solve_date,
+                }
 
         # Solvers back in CTFd → remove from ghost (they were unbanned)
         existing_ghost = [s for s in existing_ghost if str(s.get('account_id')) not in fresh_ids]
@@ -824,6 +834,45 @@ def get_scoreboard(ctf_id):
         # this fetch happened so the frontend can display a stable timestamp.
         stored = {k: v for k, v in result.items() if k != 'success'}
         stored['last_updated'] = datetime.now(timezone.utc).isoformat()
+        last_updated = stored['last_updated']
+
+        # ── Banned-player detection ───────────────────────────────────────────
+        # Compare old vs new scoreboard to find players who disappeared.
+        # For each disappeared player, last_seen = max of:
+        #   • the previous scoreboard's last_updated  — they were confirmed present
+        #     on that fetch, so that timestamp IS their last-seen-on-scoreboard time
+        #   • their most recent solve date (from solves / ghost_solves), in case
+        #     they solved something after the last scoreboard snapshot
+        old_scoreboard   = ctf_data.get('scoreboard') or {}
+        prev_sb_updated  = old_scoreboard.get('last_updated', '')  # last confirmed-present time
+        new_sb_data = stored.get('data', []) or []
+        new_ids_set = {str(e.get('account_id')) for e in new_sb_data if e.get('account_id')}
+        old_sb_data = old_scoreboard.get('data', []) or []
+        old_ids_set = {str(e.get('account_id')) for e in old_sb_data if e.get('account_id')}
+        disappeared = old_ids_set - new_ids_set
+        if disappeared:
+            banned_players_map = ctf_data.setdefault('banned_players', {})
+            old_name_by_id  = {str(e.get('account_id')): e.get('name', '') for e in old_sb_data}
+            ghost_solves_all = ctf_data.get('ghost_solves', {})
+            solves_all       = ctf_data.get('solves', {})
+            for aid in disappeared:
+                # Find the player's latest solve date across both caches
+                last_solve_date = ''
+                for chall_solves in list(ghost_solves_all.values()) + list(solves_all.values()):
+                    for s in (chall_solves or []):
+                        if str(s.get('account_id')) == aid:
+                            d = s.get('date', '')
+                            if d > last_solve_date:
+                                last_solve_date = d
+                existing_bp = banned_players_map.get(aid, {})
+                existing_ls = existing_bp.get('last_seen', '')
+                candidates  = [c for c in [existing_ls, prev_sb_updated, last_solve_date] if c]
+                banned_players_map[aid] = {
+                    'name':      existing_bp.get('name') or old_name_by_id.get(aid, ''),
+                    'last_seen': max(candidates) if candidates else last_updated,
+                }
+        # ─────────────────────────────────────────────────────────────────────
+
         ctf_data['scoreboard'] = stored
         update_ctf_cache(ctf_id, ctf_data)
         return jsonify(stored)
@@ -856,6 +905,21 @@ def get_computed_scores(ctf_id):
             if aid not in scores:
                 scores[aid] = {'name': s.get('name', f'#{aid}'), 'score': 0}
             scores[aid]['score'] += val
+
+    # Attach last_seen from banned_players for every ghost (banned) account
+    banned_players_data = ctf_data.get('banned_players') or {}
+    ghost_account_ids: set[str] = set()
+    for solve_list in ghost_solves.values():
+        for s in (solve_list or []):
+            aid = str(s.get('account_id', ''))
+            if aid:
+                ghost_account_ids.add(aid)
+    for aid in ghost_account_ids:
+        if aid in scores:
+            bp = banned_players_data.get(aid, {})
+            if bp.get('last_seen'):
+                scores[aid]['last_seen'] = bp['last_seen']
+
     return jsonify({'scores': scores})
 
 @app.route('/player/<int:ctf_id>/<int:user_id>', methods=['GET'])
@@ -915,36 +979,63 @@ def get_player_stats(ctf_id, user_id):
         else:
             ch_by_id[cid] = ch
 
-    solves_cache = ctf_data.get('solves', {})
-    player_solves = []
+    solves_cache       = ctf_data.get('solves', {})
+    ghost_solves_cache = ctf_data.get('ghost_solves', {})
+    player_solves  = []
+    found_chall_ids: set[str] = set()  # de-duplicate across regular + ghost caches
+
+    def _append_solve(chall_id_str, solve):
+        ch = ch_by_id.get(chall_id_str, {})
+        player_solves.append({
+            'challenge_id': int(chall_id_str) if chall_id_str.isdigit() else chall_id_str,
+            'name':         ch.get('name') or ch.get('title') or f'Challenge #{chall_id_str}',
+            'category':     ch.get('category') or 'Uncategorized',
+            'value':        ch.get('value') or 0,
+            'date':         solve.get('date') or '',
+            'account_id':   solve.get('account_id'),
+            'account_name': solve.get('name') or '',
+        })
+        found_chall_ids.add(chall_id_str)
 
     for chall_id_str, solve_list in solves_cache.items():
         for solve in (solve_list or []):
             if str(solve.get('account_id', '')) != str(user_id):
                 continue
-            # Found this user's solve for challenge chall_id_str
-            ch = ch_by_id.get(chall_id_str, {})
-            player_solves.append({
-                'challenge_id': int(chall_id_str) if chall_id_str.isdigit() else chall_id_str,
-                'name':         ch.get('name') or ch.get('title') or f'Challenge #{chall_id_str}',
-                'category':     ch.get('category') or 'Uncategorized',
-                'value':        ch.get('value') or 0,
-                'date':         solve.get('date') or '',
-                'account_id':   solve.get('account_id'),
-                'account_name': solve.get('name') or '',
-            })
+            _append_solve(chall_id_str, solve)
             break  # each challenge is solved at most once per user
+
+    # Also search ghost_solves for banned players whose solves were moved there
+    for chall_id_str, solve_list in ghost_solves_cache.items():
+        if chall_id_str in found_chall_ids:
+            continue
+        for solve in (solve_list or []):
+            if str(solve.get('account_id', '')) != str(user_id):
+                continue
+            _append_solve(chall_id_str, solve)
+            break
 
     # Sort ascending by date so the frontend can build a timeline left-to-right
     player_solves.sort(key=lambda s: s.get('date') or '')
 
     total_score = sum(int(s.get('value') or 0) for s in player_solves)
 
+    # Determine whether this player is banned (present in any ghost_solves entry)
+    is_banned = any(
+        any(str(s.get('account_id')) == str(user_id) for s in (sl or []))
+        for sl in ghost_solves_cache.values()
+    )
+    last_seen_date = None
+    if is_banned:
+        bp = (ctf_data.get('banned_players') or {}).get(str(user_id), {})
+        last_seen_date = bp.get('last_seen')
+
     return jsonify({
         'user_id':     user_id,
         'solve_count': len(player_solves),
         'total_score': total_score,
         'solves':      player_solves,
+        'banned':      is_banned,
+        'last_seen':   last_seen_date,
     })
 
 @app.route('/ctfd_title', methods=['POST'])
@@ -1124,16 +1215,15 @@ def get_user_challenges(ctf_id, user_id):
     ctf_data = load_ctf_cache(ctf_id)
     if ctf_data is None:
         return jsonify({'error': f"CTF #{ctf_id} not found"}), 404
-    challenges = ctf_data.get('challenges', [])
+    challenges   = ctf_data.get('challenges', [])
     solves_cache = ctf_data.get('solves', {})
+    ghost_solves = ctf_data.get('ghost_solves', {})
     solved_ids = []
     for ch in challenges:
-        chall_id = ch.get('id')
-        solves = []
-        if str(chall_id) not in solves_cache:
-            continue
-        # Check if user_id is in solves
-        for solve in solves_cache[str(chall_id)]:
+        chall_id  = ch.get('id')
+        chall_key = str(chall_id)
+        # Check regular solves first, then ghost_solves (banned players)
+        for solve in solves_cache.get(chall_key, []) + ghost_solves.get(chall_key, []):
             if str(solve.get('account_id')) == str(user_id):
                 solved_ids.append(chall_id)
                 break
