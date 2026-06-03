@@ -1,6 +1,6 @@
 {
   "name": "ctfd-helper",
-  "version": "0.3.0",
+  "version": "0.4.1",
   "description": "Alternative web client interface for Capture The Flags events.",
   "main": "main.js",
   "scripts": {
