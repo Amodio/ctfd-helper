@@ -232,7 +232,6 @@ export class CtfChallenges extends LitElement {
       /* status icon cell */
     }
     .status-solved   { color: #7fff7f; font-size: 1.5em; margin-left: 0.2em; }
-    .status-pending  { font-size: 1.5em; margin-left: 0.2em; }
     .status-unsolved { color: #ff7f7f; font-size: 1.5em; margin-left: 0.2em; }
     .td-name {
       font-weight: bold;
@@ -851,7 +850,7 @@ export class CtfChallenges extends LitElement {
                           ${ch.solved_by_me === true
                             ? html`<span class="status-solved">✔</span>`
                             : (ch.has_pending_flags && !this.hasUserName)
-                              ? html`<span class="status-pending" title="You have a flag to submit">❔</span>`
+                              ? html`<span title="You have a flag to submit">❔</span>`
                               : html`<span class="status-unsolved">✗</span>`}
                         </td>
                         <td class="td-name">${nameCell}</td>
