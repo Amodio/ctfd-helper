@@ -698,7 +698,7 @@ export class CtfChallenge extends LitElement {
                 else bg = '#444';
                 let flagSpan = html`<span
                   style="cursor:${f.state === 'untested' ? 'pointer' : 'default'};"
-                  title="${f.state === 'untested' ? 'Test this flag' : (['valid','invalid'].includes(f.state) && f.submitted_at ? 'Submitted: ' + new Date(f.submitted_at).toLocaleString() : '')}"
+                  title="${f.state === 'untested' ? 'Submit this flag' : (['valid','invalid'].includes(f.state) && f.submitted_at ? 'Submitted: ' + new Date(f.submitted_at).toLocaleString() : '')}"
                   @click=${f.state === 'untested' ? (e => { e.stopPropagation(); this._testFlag(idx); }) : null}
                 >${f.value}</span>`;
                 return html`<li class="flag-item" style="background:${bg};">
