@@ -906,19 +906,44 @@ def get_computed_scores(ctf_id):
                 scores[aid] = {'name': s.get('name', f'#{aid}'), 'score': 0}
             scores[aid]['score'] += val
 
-    # Attach last_seen from banned_players for every ghost (banned) account
+    # Attach last_seen for every ghost (banned) account.
+    # Recompute as max(stored_value, all_cached_solve_dates) so that last_seen is
+    # never earlier than the player's latest visible solve, even if banned_players
+    # was persisted before all solves were moved to ghost_solves.
     banned_players_data = ctf_data.get('banned_players') or {}
+
+    # Pass 1: collect ghost account IDs and their latest solve date across all caches.
     ghost_account_ids: set[str] = set()
+    latest_solve_date: dict[str, str] = {}   # aid -> max date seen in any cache
     for solve_list in ghost_solves.values():
         for s in (solve_list or []):
             aid = str(s.get('account_id', ''))
-            if aid:
-                ghost_account_ids.add(aid)
+            if not aid:
+                continue
+            ghost_account_ids.add(aid)
+            d = s.get('date', '')
+            if d and d > latest_solve_date.get(aid, ''):
+                latest_solve_date[aid] = d
+    # Also scan regular solves in case some haven't been moved to ghost yet
+    for solve_list in cached_solves.values():
+        for s in (solve_list or []):
+            aid = str(s.get('account_id', ''))
+            if aid not in ghost_account_ids:
+                continue
+            d = s.get('date', '')
+            if d and d > latest_solve_date.get(aid, ''):
+                latest_solve_date[aid] = d
+
+    # Pass 2: compute best last_seen = max(stored scoreboard component, latest solve)
     for aid in ghost_account_ids:
         if aid in scores:
-            bp = banned_players_data.get(aid, {})
-            if bp.get('last_seen'):
-                scores[aid]['last_seen'] = bp['last_seen']
+            bp      = banned_players_data.get(aid, {})
+            best_ls = bp.get('last_seen', '')
+            solve_d = latest_solve_date.get(aid, '')
+            if solve_d and solve_d > best_ls:
+                best_ls = solve_d
+            if best_ls:
+                scores[aid]['last_seen'] = best_ls
 
     return jsonify({'scores': scores})
 
@@ -1027,7 +1052,16 @@ def get_player_stats(ctf_id, user_id):
     last_seen_date = None
     if is_banned:
         bp = (ctf_data.get('banned_players') or {}).get(str(user_id), {})
-        last_seen_date = bp.get('last_seen')
+        # Start from the stored value (which holds the scoreboard component), then
+        # take the max with every solve date we actually have cached.  This corrects
+        # cases where banned_players was written before all solves were moved to
+        # ghost_solves, leaving last_seen earlier than the player's latest activity.
+        best_ls = bp.get('last_seen', '')
+        for s in player_solves:
+            d = s.get('date', '')
+            if d and d > best_ls:
+                best_ls = d
+        last_seen_date = best_ls or None
 
     return jsonify({
         'user_id':     user_id,

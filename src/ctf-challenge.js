@@ -335,7 +335,7 @@ export class CtfChallenge extends LitElement {
       justify-content: center;
     }
     .flag-input {
-      width: 440px;
+      width: 840px;
       max-width: 90vw;
       padding: 0.85em 1.6em;
       border-radius: 12px;
@@ -720,7 +720,7 @@ export class CtfChallenge extends LitElement {
       } else if (!isLocked) {
         flagInput = html`
           <form class="flag-form" @submit=${e => this._submitFlag(e)}>
-            <input type="text" name="flag" placeholder="Add the flag, then click to test."
+            <input type="text" name="flag" placeholder="Store a flag, later click on it to submit it."
               class="flag-input"
               .value=${this.flagDraft || ''}
               @input=${e => this.flagDraft = e.target.value}
