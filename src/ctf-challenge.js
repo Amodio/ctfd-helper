@@ -413,17 +413,16 @@ export class CtfChallenge extends LitElement {
       const resp = await fetch(url, { cache: 'reload' });
       if (!resp.ok) throw new Error('Failed to fetch challenge info');
       const data = await resp.json();
-      const prevSolvedByMe = challenge.solved_by_me;
       this.challenge = data.challenge;
       if (this.viewOnly) {
-        this.challenge.solved_by_me = prevSolvedByMe;
+        // User-view mode
         this.flags = [];
+      } else {
+        this.flags = Array.isArray(data.flags) ? data.flags.map(f => ({
+          ...f,
+          value: f.value !== undefined ? f.value : (f.submission !== undefined ? f.submission : '')
+        })) : [];
       }
-      this.flags = Array.isArray(data.flags) ? data.flags.map(f => ({
-        ...f,
-        value: f.value !== undefined ? f.value : (f.submission !== undefined ? f.submission : '')
-      })) : [];
-      this.challenge.flags = this.flags;
       if (Array.isArray(data.hints)) {
         this.challenge.hints = data.hints.map(h => ({ ...h, _loading: false, content: h.content || h.description || '' }));
       } else {
@@ -800,7 +799,8 @@ export class CtfChallenge extends LitElement {
         ${fileLinks}
         ${flagList}
         ${flagInput}
-        ${ch.solved_by_me === true || hasValidFlag ? html`<div class="solved-msg">✔ Solved</div>` : ''}
+        ${(this.viewOnly && ch.solved_by_me === true) || hasValidFlag
+              ? html`<div class="solved-msg">✔ Solved</div>` : ''}
         ${this.showSolvesBox && this._solvesBoxChallengeId ? html`
           <ctf-solves-box
             .ctfId=${this._solvesBoxCtfId}
