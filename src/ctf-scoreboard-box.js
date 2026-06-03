@@ -166,7 +166,7 @@ export class CtfScoreboardBox extends LitElement {
     .banned-row td       { background: #251015 !important; }
     .banned-row:hover td { background: #331520 !important; }
 
-    .td-pos-clean { color: #5a7a6a; text-align: right; width: 4em;  white-space: nowrap; }
+    .td-pos-clean { text-align: right; width: 4em;  white-space: nowrap; }
     .td-pos-full  { color: #9090d0; text-align: right; width: 3em;  white-space: nowrap; font-weight: bold; }
     .td-name      { min-width: 9em; }
     .td-name a    { color: #00eaff; text-decoration: underline; }
@@ -217,7 +217,8 @@ export class CtfScoreboardBox extends LitElement {
   updated(changedProps) {
     if (changedProps.has('open')) {
       if (this.open) this.setAttribute('open', '');
-      else           this.removeAttribute('open');
+      // on scoreboard box close:
+      else         { this.removeAttribute('open'); this._hideNotBanned = false; }
     }
 
     if (changedProps.has('ctfId') && this.ctfId !== changedProps.get('ctfId')) {
@@ -425,8 +426,8 @@ export class CtfScoreboardBox extends LitElement {
       for (const r of [...bannedGroup, ...mismatchGroup]) r.listingRank = rank++;
 
       const rows = [
-        ...(bannedGroup.length   > 0 ? [{ isHeader: true, label: '🚫 Banned' },          ...bannedGroup]   : []),
-        ...(mismatchGroup.length > 0 ? [{ isHeader: true, label: '⚠️ Score mismatch' }, ...mismatchGroup] : []),
+        ...(bannedGroup.length   > 0 ? [{ isHeader: true, label: `🚫 Banned (${bannedGroup.length})` },          ...bannedGroup]   : []),
+        ...(mismatchGroup.length > 0 ? [{ isHeader: true, label: `⚠️ Score mismatch (${mismatchGroup.length})` }, ...mismatchGroup] : []),
       ];
 
       return { rows, hasComputed: true, hasBanned, monkeyMode: true, bannedCount: bannedGroup.length, mismatchCount: mismatchGroup.length };
@@ -512,15 +513,6 @@ export class CtfScoreboardBox extends LitElement {
           ` : html`<span class="ts-never">Scoreboard not yet fetched</span>`}
         </div>
 
-        ${monkeyMode ? html`
-          <div class="status-bar" style="margin-top:0.1em;">
-            ${bannedCount   > 0 ? html`<span style="color:#ffb0b8;">🚫 <b>${bannedCount}</b> banned</span>`          : ''}
-            ${mismatchCount > 0 ? html`<span style="color:#ffd060;">⚠️ <b>${mismatchCount}</b> score mismatch</span>` : ''}
-            ${bannedCount === 0 && mismatchCount === 0 && !this._computing
-              ? html`<span style="color:#4a8;">✓ No discrepancies detected</span>` : ''}
-          </div>
-        ` : ''}
-
         ${this._loading ? html`<div class="loading-notice">⏳ Loading scoreboard…</div>` : ''}
         ${this._error   ? html`<div class="error">${this._error}</div>`                  : ''}
 
@@ -529,8 +521,8 @@ export class CtfScoreboardBox extends LitElement {
             <thead>
               <tr>
                 ${monkeyMode ? html`
-                  <th class="td-pos-full" title="Full rank (banned players re-inserted)"># full</th>
-                  <th class="td-pos-full" title="Rank within this filtered listing"># list</th>
+                  <th class="td-pos-full" title="Rank within this filtered listing"># List</th>
+                  <th class="td-pos-clean" title="Full rank (banned players re-inserted)"># Rank</th>
                   <th>Name</th>
                   <th style="text-align:right;" title="Official score from CTFd">Score</th>
                   <th class="td-computed" title="Computed score from cached solves">Computed</th>
@@ -538,11 +530,11 @@ export class CtfScoreboardBox extends LitElement {
                 ` : html`
                   <th class="td-pos-full"
                       title="Rank if banned players were re-inserted by their computed score">
-                    # full
+                    # Full
                   </th>
                   <th class="td-pos-clean"
                       title="Official rank — banned players already removed by CTFd">
-                    # clean
+                    # Rank
                   </th>
                   <th>Name</th>
                   <th style="text-align:right;" title="Official score from CTFd">Score</th>
@@ -581,8 +573,8 @@ export class CtfScoreboardBox extends LitElement {
                   const isBanned = entry.banned;
                   return html`
                     <tr class="${isBanned ? 'banned-row' : ''}">
-                      <td class="td-pos-full">${entry.pos_full ?? '—'}</td>
                       <td class="td-pos-full">${entry.listingRank}</td>
+                      <td class="td-pos-clean">${entry.pos_full ?? '—'}</td>
                       <td class="td-name">
                         <a href=${this._playerHref(entry)} target="_blank">${entry.name}</a>
                       </td>
