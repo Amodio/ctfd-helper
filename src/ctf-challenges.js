@@ -285,8 +285,6 @@ export class CtfChallenges extends LitElement {
     this.slowRefresh = 0;
     this.showScoreboard  = false;
     this._pbOpen         = false;
-    const loginLocal = localStorage.getItem('last-ctf-login');
-    this._login = loginLocal || '';
   }
 
   set ctfId(val) {
@@ -303,25 +301,6 @@ export class CtfChallenges extends LitElement {
     return this._ctfId;
   }
 
-  set login(val) {
-    if (!val) {
-      const loginLocal = localStorage.getItem('last-ctf-login');
-      if (loginLocal) {
-        this._login = loginLocal;
-        this.requestUpdate('login');
-        return;
-      }
-    }
-    this._login = val;
-    if (val) {
-      localStorage.setItem('last-ctf-login', val);
-    }
-    this.requestUpdate('login');
-  }
-  get login() {
-    return this._login;
-  }
-
   async connectedCallback() {
     super.connectedCallback();
     const params = new URLSearchParams(window.location.search);
@@ -334,7 +313,7 @@ export class CtfChallenges extends LitElement {
       // The display name is a placeholder until the scoreboard fires
       // 'scoreboard-updated' and we can resolve the real name by account_id.
       this.hasUserName = !!userId;
-      this.userName = this.hasUserName ? `User #${this.userId}` : (this.login || '');
+      this.userName = this.hasUserName ? `User #${this.userId}` : '';
       await this.loadChallenges();
     } else {
       console.warn('[CtfChallengesAsUser] Missing ctfId or userId', { ctfId, userId });
@@ -379,8 +358,8 @@ export class CtfChallenges extends LitElement {
       const newChallenges = this.ctfData.challenges || [];
       if (this.ctfData.url) this.ctfUrl = this.ctfData.url;
       if (this.ctfData.name) this.ctfName = this.ctfData.name;
-      if (typeof this.selectedCtf === 'object' && this.selectedCtf && this.selectedCtf.login) {
-        this.login = this.selectedCtf.login;
+      if (!this.hasUserName && this.ctfData.login) {
+        this.userName = this.ctfData.login;
       }
       if (forceRefresh) {
         this.challengeDetails = {};
@@ -666,7 +645,7 @@ export class CtfChallenges extends LitElement {
         return ch;
       });
     }
-    let displayName = this.userName ? this.userName : this.login;
+    let displayName = this.userName;
     let ctfName = '';
     if (typeof ctfData.name === 'string' && ctfData.name) {
       ctfName = ctfData.name;
