@@ -696,9 +696,6 @@ export class CtfChallenges extends LitElement {
     const _bCache        = _bannedCache[this.ctfId] || {};
     const _bannedEntry   = pbUserId ? _bCache[String(pbUserId)] : null;
     const isBannedPlayer = !!_bannedEntry;
-    const lastSeenStr    = isBannedPlayer && _bannedEntry.last_seen
-      ? _fmtDateShort(_bannedEntry.last_seen)
-      : null;
 
     return html`
       <div class="challenges-wrapper">
@@ -763,9 +760,7 @@ export class CtfChallenges extends LitElement {
           ` : ''}
           ${isBannedPlayer
             ? html`<span class="rank-chip"
-                         style="background:#2a1020;border-color:#7a1030;color:#ffb0b8;">
-                     🚫 BANNED${cleanRank !== null ? html` #${cleanRank}` : ''}${lastSeenStr ? html` · ${lastSeenStr}` : ''}
-                   </span>`
+                         style="background:#2a1020;border-color:#7a1030;color:#ffb0b8;">${cleanRank !== null ? html`#${cleanRank}` : ''}</span>`
             : cleanRank !== null ? html`<span class="rank-chip">#${cleanRank}</span>` : ''}
           <span class="stats-pct">
             ${solved}/${total} solved (${total > 0 ? Math.round((solved/total)*100) : 0}%)
