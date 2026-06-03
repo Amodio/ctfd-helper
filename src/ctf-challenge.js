@@ -414,8 +414,8 @@ export class CtfChallenge extends LitElement {
       if (!resp.ok) throw new Error('Failed to fetch challenge info');
       const data = await resp.json();
       this.challenge = data.challenge;
+      // User-view mode
       if (this.viewOnly) {
-        // User-view mode
         this.flags = [];
       } else {
         this.flags = Array.isArray(data.flags) ? data.flags.map(f => ({
@@ -799,8 +799,7 @@ export class CtfChallenge extends LitElement {
         ${fileLinks}
         ${flagList}
         ${flagInput}
-        ${(this.viewOnly && ch.solved_by_me === true) || hasValidFlag
-              ? html`<div class="solved-msg">✔ Solved</div>` : ''}
+        ${(this.viewOnly && ch.solved_by_me === true) || hasValidFlag ? html`<div class="solved-msg">✔ Solved</div>` : ''}
         ${this.showSolvesBox && this._solvesBoxChallengeId ? html`
           <ctf-solves-box
             .ctfId=${this._solvesBoxCtfId}

@@ -530,8 +530,10 @@ export class CtfChallenges extends LitElement {
       const challenges = (this.ctfData && this.ctfData.challenges) || [];
       const ch = challenges.find(c => c.id === updated.id);
       if (ch) {
-        if (typeof updated.solves === 'number') ch.solves = updated.solves;
-        if (typeof updated.value  === 'number') ch.value  = updated.value;
+        if (typeof updated.solves       === 'number') ch.solves       = updated.solves;
+        if (typeof updated.value        === 'number') ch.value        = updated.value;
+        if (typeof updated.attempts     === 'number') ch.attempts     = updated.attempts;
+        if (typeof updated.max_attempts === 'number') ch.max_attempts = updated.max_attempts;
         this.ctfData = { ...this.ctfData, challenges: [...challenges] };
       }
       // Crucially: also update selectedChallenge. ctf-challenges re-renders when
@@ -541,8 +543,10 @@ export class CtfChallenges extends LitElement {
       if (this.selectedChallenge && String(this.selectedChallenge.id) === String(updated.id)) {
         this.selectedChallenge = {
           ...this.selectedChallenge,
-          ...(typeof updated.solves === 'number' && { solves: updated.solves }),
-          ...(typeof updated.value  === 'number' && { value:  updated.value }),
+          ...(typeof updated.solves       === 'number' && { solves:       updated.solves }),
+          ...(typeof updated.value        === 'number' && { value:        updated.value }),
+          ...(typeof updated.attempts     === 'number' && { attempts:     updated.attempts }),
+          ...(typeof updated.max_attempts === 'number' && { max_attempts: updated.max_attempts }),
         };
       }
       this.requestUpdate();
