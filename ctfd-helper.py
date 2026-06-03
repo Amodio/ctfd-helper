@@ -463,6 +463,7 @@ def fetch_session_token(url, login, password, ctf_data=None, ctf_id=None):
         if ctf_data is not None and ctf_id is not None:
             if ctf_data.get('token') != session_cookie:
                 ctf_data['token'] = session_cookie
+                ctf_data.pop('csrf_nonce', None)  # Nonce is tied to the session; clear it so it gets re-fetched
                 update_ctf_cache(ctf_id, ctf_data)
         return session_cookie, None
     except Exception as e:
@@ -528,6 +529,18 @@ def fetch_csrf_nonce(url, token):
         return None, "Error: Could not find csrfNonce in CTFd index page response!"
     return csrf_nonce, None
 
+def get_csrf_nonce(url, token, ctf_data=None, ctf_id=None):
+    """Return a cached CSRF nonce for the current session, fetching and caching it on first use.
+    The nonce is session-stable in CTFd, so one GET / per session is enough."""
+    cached = ctf_data.get('csrf_nonce') if ctf_data else None
+    if cached:
+        return cached, None
+    nonce, err = fetch_csrf_nonce(url, token)
+    if nonce and ctf_data is not None and ctf_id is not None:
+        ctf_data['csrf_nonce'] = nonce
+        update_ctf_cache(ctf_id, ctf_data)
+    return nonce, err
+
 @app.route('/test_flag/<int:ctf_id>/<int:chall_id>/<int:flag_id>', methods=['POST'])
 def test_flag(ctf_id, chall_id, flag_id):
     """Submits a flag to the CTFd API and returns the result. Updates flag state based on response."""
@@ -549,8 +562,8 @@ def test_flag(ctf_id, chall_id, flag_id):
         token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
         if not token:
             return jsonify({'error': f"Could not fetch session token: {err}"}), 502
-    # Fetch CSRF token
-    csrf_nonce, err_msg = fetch_csrf_nonce(url, token)
+    # Fetch CSRF token (cached per session; only hits the network on first use or after re-login)
+    csrf_nonce, err_msg = get_csrf_nonce(url, token, ctf_data, ctf_id)
     if csrf_nonce is None or err_msg:
         return jsonify({'error': err_msg}), 502
     headers = {'Cookie': f"session={token}", 'Csrf-Token': csrf_nonce}
@@ -563,7 +576,7 @@ def test_flag(ctf_id, chall_id, flag_id):
                 token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
                 if not token:
                     return jsonify({'success': False, 'error': f"Could not fetch session token: {err}"}), 502
-                csrf_nonce, err_msg = fetch_csrf_nonce(url, token)
+                csrf_nonce, err_msg = get_csrf_nonce(url, token, ctf_data, ctf_id)
                 if csrf_nonce is None or err_msg:
                     return jsonify({'success': False, 'error': err_msg}), 502
                 headers = {'Cookie': f"session={token}", 'Csrf-Token': csrf_nonce}
@@ -1209,8 +1222,8 @@ def get_hint_content(ctf_id, chall_id, hint_id):
             update_ctf_cache(ctf_id, ctf_data)
             return jsonify({'content': content})
         # If no content, try to unlock the hint
-        # Fetch CSRF token for unlocks
-        csrf_nonce, err_msg = fetch_csrf_nonce(url, token)
+        # Fetch CSRF token for unlocks (cached per session)
+        csrf_nonce, err_msg = get_csrf_nonce(url, token, ctf_data, ctf_id)
         if csrf_nonce is None or err_msg:
             return jsonify({'error': err_msg or 'Could not fetch CSRF token for unlock'}), 502
         unlock_url = f"{url}/api/v1/unlocks"
