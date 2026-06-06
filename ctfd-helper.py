@@ -571,8 +571,12 @@ def test_flag(ctf_id, chall_id, flag_id):
     try:
         r = requests.post(f"{url}/api/v1/challenges/attempt", headers=headers, json={'challenge_id': chall_id, 'submission': flag}, timeout=60)
         if not r.ok:
-            # Try to refresh token if unauthorized
-            if r.status_code == 401:
+            # CTFd returns 401 for expired sessions on some endpoints, but 403
+            # on others (including /api/v1/challenges/attempt) — even when the
+            # real cause is an expired session rather than a permissions problem.
+            # Treat both the same: full re-login to get a fresh session cookie
+            # *and* a fresh CSRF nonce in one shot.
+            if r.status_code in (401, 403):
                 token, err = fetch_session_token(url, login, password, ctf_data, ctf_id)
                 if not token:
                     return jsonify({'success': False, 'error': f"Could not fetch session token: {err}"}), 502
