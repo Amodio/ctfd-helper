@@ -780,7 +780,10 @@ def _fetch_and_cache_challenge_solves(ctf_id, chall_id, ctf_data=None):
                 candidates = [c for c in [existing_ls, solve_date] if c]
                 banned_players_map[aid] = {
                     'name': existing_bp.get('name') or s.get('name', ''),
-                    'last_seen': max(candidates) if candidates else solve_date,
+                    # Fall back to now if every candidate is empty (solve record has no date
+                    # and there is no previously stored last_seen).  The scoreboard path
+                    # already uses last_updated as its fallback for the same reason.
+                    'last_seen': max(candidates) if candidates else datetime.now(timezone.utc).isoformat(),
                 }
 
         # Solvers back in CTFd → remove from ghost (they were unbanned)
@@ -941,18 +944,26 @@ def get_computed_scores(ctf_id):
             d = s.get('date', '')
             if d and d > latest_solve_date.get(aid, ''):
                 latest_solve_date[aid] = d
-    # Also scan regular solves in case some haven't been moved to ghost yet
+    # Scan regular solves for:
+    #   (a) ghost accounts whose solves haven't all been moved yet, AND
+    #   (b) players detected as banned via the scoreboard comparison but whose
+    #       solves are still in cached_solves (challenge caches not yet refreshed).
+    # Without (b), Pass 2 never runs for those players and last_seen is never set.
+    banned_aid_set = set(banned_players_data.keys())
     for solve_list in cached_solves.values():
         for s in (solve_list or []):
             aid = str(s.get('account_id', ''))
-            if aid not in ghost_account_ids:
+            if aid not in ghost_account_ids and aid not in banned_aid_set:
                 continue
             d = s.get('date', '')
             if d and d > latest_solve_date.get(aid, ''):
                 latest_solve_date[aid] = d
 
-    # Pass 2: compute best last_seen = max(stored scoreboard component, latest solve)
-    for aid in ghost_account_ids:
+    # Pass 2: compute best last_seen = max(stored scoreboard component, latest solve).
+    # Iterate over the union of ghost players and known-banned players: a player detected
+    # as banned through the scoreboard comparison may not yet have ghost_solves (their
+    # solves are still in cached_solves), so ghost_account_ids alone is too narrow.
+    for aid in ghost_account_ids | banned_aid_set:
         if aid in scores:
             bp      = banned_players_data.get(aid, {})
             best_ls = bp.get('last_seen', '')
