@@ -804,7 +804,7 @@ export class CtfChallenges extends LitElement {
                       attemptsSpan = html`<span class="attempts-warn">&nbsp;&nbsp;(attempts: ${attempts}/${maxAttempts})</span>`;
                     }
                     const nameWithAttempts = html`${name}${attemptsSpan}`;
-                    const nameCell = (maxAttempts !== null && maxAttempts > 0 && attempts === maxAttempts)
+                    const nameCell = isLocked
                       ? html`<del>${nameWithAttempts}</del>`
                       : nameWithAttempts;
                     const tagsCell = ch.tags && ch.tags.length
