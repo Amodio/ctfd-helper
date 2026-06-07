@@ -14,6 +14,7 @@ function catColor(idx) {
 export class CtfPlayerBox extends LitElement {
   static properties = {
     ctfId:      { type: Number },
+    ctfUrl:     { type: String },
     userId:     { type: Number },
     userName:   { type: String },
     open:       { type: Boolean, reflect: true },
@@ -111,6 +112,16 @@ export class CtfPlayerBox extends LitElement {
       line-height: 1.1;
     }
     .close-btn:hover { background: #b52a37; }
+    .ext-profile-link {
+      font-size: 0.62em;
+      text-decoration: none;
+      opacity: 0.6;
+      margin-left: 0.4em;
+      vertical-align: middle;
+      -webkit-text-fill-color: #5588aa;
+      color: #5588aa;
+    }
+    .ext-profile-link:hover { -webkit-text-fill-color: #88ccff; color: #88ccff; opacity: 1; }
 
     /* ── Section title ────────────────────────────────────────────────── */
     .section-title {
@@ -248,6 +259,7 @@ export class CtfPlayerBox extends LitElement {
   constructor() {
     super();
     this.ctfId    = null;
+    this.ctfUrl   = '';
     this.userId   = null;
     this.userName = '';
     this.open      = false;
@@ -529,7 +541,7 @@ export class CtfPlayerBox extends LitElement {
           <!-- Header -->
           <div class="header">
             <span class="player-icon">${this._banned ? '🚫' : '🧑‍💻'}</span>
-            <h2 class="player-name">${this.userName || `User #${this.userId}`}</h2>
+            <h2 class="player-name">${this.userName || `User #${this.userId}`}${this.ctfUrl && this.userId != null ? html`<a class="ext-profile-link" href="${this.ctfUrl.replace(/\/+$/, '')}/users/${this.userId}" target="_blank" rel="noreferrer noopener" title="View profile on CTFd">↗</a>` : ''}</h2>
             <div class="chips">
               ${this.rank != null ? html`<span class="chip rank">#${this.rank}</span>` : ''}
               ${this._banned ? html`

@@ -171,6 +171,15 @@ export class CtfScoreboardBox extends LitElement {
     .td-name      { min-width: 9em; }
     .td-name a    { color: #00eaff; text-decoration: underline; }
     .td-name a:hover { color: #66ffff; }
+    .ext-link {
+      font-size: 0.72em;
+      margin-left: 0.3em;
+      color: #5588aa;
+      text-decoration: none !important;
+      vertical-align: super;
+      opacity: 0.75;
+    }
+    .ext-link:hover { color: #88ccff !important; opacity: 1; }
     .td-score     { color: #ffd700; text-align: right; width: 5.5em; }
     .td-computed  { color: #9ab4e0; text-align: right; width: 5.5em; font-size: 0.88em; }
     .td-status    { text-align: center; width: 5em; }
@@ -471,6 +480,12 @@ export class CtfScoreboardBox extends LitElement {
     return '/?user_id=' + encodeURIComponent(entry.account_id);
   }
 
+  _ctfPlayerHref(entry) {
+    if (!this.ctfUrl) return null;
+    const base = this.ctfUrl.replace(/\/+$/, '');
+    return `${base}/users/${entry.account_id}`;
+  }
+
   // ── render ────────────────────────────────────────────────────────────────
 
   render() {
@@ -576,7 +591,7 @@ export class CtfScoreboardBox extends LitElement {
                       <td class="td-pos-full">${entry.listingRank}</td>
                       <td class="td-pos-clean">${entry.pos_full ?? '—'}</td>
                       <td class="td-name">
-                        <a href=${this._playerHref(entry)} target="_blank">${entry.name}</a>
+                        <a href=${this._playerHref(entry)} target="_blank">${entry.name}</a>${this._ctfPlayerHref(entry) ? html`<a class="ext-link" href=${this._ctfPlayerHref(entry)} target="_blank" rel="noreferrer noopener" title="View on CTFd">↗</a>` : ''}
                       </td>
                       <td class="td-score">
                         ${entry.banned && entry.last_seen
@@ -617,7 +632,7 @@ export class CtfScoreboardBox extends LitElement {
                         : html`<span style="color:#552233;">—</span>`}
                     </td>
                     <td class="td-name">
-                      <a href=${this._playerHref(entry)} target="_blank">${entry.name}</a>
+                      <a href=${this._playerHref(entry)} target="_blank">${entry.name}</a>${this._ctfPlayerHref(entry) ? html`<a class="ext-link" href=${this._ctfPlayerHref(entry)} target="_blank" rel="noreferrer noopener" title="View on CTFd">↗</a>` : ''}
                     </td>
                     <td class="td-score">
                       ${entry.banned && entry.last_seen

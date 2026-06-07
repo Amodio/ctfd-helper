@@ -877,6 +877,7 @@ export class CtfChallenges extends LitElement {
 
         <ctf-player-box
           .ctfId=${this.ctfId}
+          .ctfUrl=${this.ctfUrl || ''}
           .userId=${pbUserId}
           .userName=${displayName || `User #${pbUserId}`}
           .rank=${cleanRank}
