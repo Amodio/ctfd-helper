@@ -480,6 +480,12 @@ export class CtfScoreboardBox extends LitElement {
     return '/?user_id=' + encodeURIComponent(entry.account_id);
   }
 
+  _ctfScoreboardHref() {
+    if (!this.ctfUrl) return null;
+    const base = this.ctfUrl.replace(/\/+$/, '');
+    return `${base}/scoreboard`;
+  }
+
   _ctfPlayerHref(entry) {
     if (!this.ctfUrl) return null;
     const base = this.ctfUrl.replace(/\/+$/, '');
@@ -504,7 +510,7 @@ export class CtfScoreboardBox extends LitElement {
       <div class="box">
         <!-- header -->
         <div class="header-row">
-          <h3>🏆 Scoreboard</h3>
+          <h3>🏆 Scoreboard${this._ctfScoreboardHref() ? html `<a class="ext-link" href=${this._ctfScoreboardHref()} target="_blank" rel="noreferrer noopener" title="View on CTFd">↗</a>` : ''}</h3>
           ${this._computing ? html`<span style="font-size:0.82em;color:#ffd700;">⚙️ computing…</span>` : ''}
           <button
             class="monkey-toggle"
