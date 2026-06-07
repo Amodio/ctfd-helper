@@ -201,6 +201,18 @@ export class CtfChallenge extends LitElement {
       font-weight: normal;
       margin-left: 0.7em;
     }
+    .ctf-ext-link {
+      font-size: 0.65em;
+      color: #7fffd4;
+      text-decoration: none;
+      margin-left: 0.5em;
+      vertical-align: middle;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+    .ctf-ext-link:hover {
+      opacity: 1;
+    }
     /* meta row */
     .meta-category {
       color: #00eaff;
@@ -765,6 +777,7 @@ export class CtfChallenge extends LitElement {
         <h2 class="challenge-header">
           <span class="challenge-title">
             ${ch.name || ch.title || 'Unnamed Challenge'}
+            ${(this.ctfUrl && ch.id != null) ? html`<a class="ctf-ext-link" href="${this.ctfUrl.replace(/\/$/, '')}/challenges#${encodeURIComponent(ch.name || ch.title || '')}-${ch.id}" target="_blank" rel="noreferrer noopener" title="View on CTFd">↗</a>` : ''}
             ${ch.attribution ? html`<span class="challenge-attribution"><b>${ch.attribution}</b></span>` : ''}
           </span>
           <button title="Magic" @click=${() => { this.showMagic = true; }} class="magic-btn">🪄</button>
